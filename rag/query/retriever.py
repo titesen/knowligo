@@ -69,20 +69,25 @@ class FAISSRetriever:
         self.index = faiss.read_index(str(self.index_path))
         print(f"✅ Índice cargado ({self.index.ntotal} vectores)")
 
-        # Cargar metadata de chunks
-        if not self.metadata_path.exists():
-            raise FileNotFoundError(f"Metadata no encontrada: {self.metadata_path}")
+        # Cargar metadata de chunks desde pickle
+        chunks_path = self.metadata_path.parent / "chunks.pkl"
 
-        with open(self.metadata_path, "r", encoding="utf-8") as f:
-            metadata = json.load(f)
+        if not chunks_path.exists():
+            raise FileNotFoundError(
+                f"Chunks no encontrados: {chunks_path}\n"
+                "Ejecuta primero: python rag/ingest/build_index.py"
+            )
 
-        self.chunks = metadata.get("chunks", [])
+        with open(chunks_path, "rb") as f:
+            self.chunks = pickle.load(f)
 
         if len(self.chunks) != self.index.ntotal:
             print(
                 f"⚠️  Warning: Número de chunks ({len(self.chunks)}) "
                 f"no coincide con vectores en índice ({self.index.ntotal})"
             )
+        else:
+            print(f"✅ {len(self.chunks)} chunks cargados")
 
     def retrieve(
         self, query: str, top_k: int = 3, score_threshold: float = None

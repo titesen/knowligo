@@ -10,6 +10,7 @@ Expone endpoints para:
 import os
 import sys
 from pathlib import Path
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -28,24 +29,6 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Crear app
-app = FastAPI(
-    title="KnowLigo RAG API",
-    description="API REST para chatbot de soporte IT con RAG",
-    version="1.0.0",
-    docs_url="/docs",
-    redoc_url="/redoc",
-)
-
-# CORS middleware (para desarrollo)
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],  # En producción, especificar dominios
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
 # Inicializar pipeline (lazy loading)
 _pipeline = None
 
@@ -60,23 +43,41 @@ def get_pipeline() -> RAGPipeline:
     return _pipeline
 
 
-@app.on_event("startup")
-async def startup_event():
-    """Evento de inicio de la aplicación"""
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Lifespan event handler"""
+    # Startup
     logger.info("🚀 KnowLigo API iniciando...")
     try:
-        # Pre-cargar pipeline
         get_pipeline()
         logger.info("✅ Pipeline pre-cargado")
     except Exception as e:
         logger.error(f"❌ Error inicializando pipeline: {e}")
-        # No fallar el startup, pero loguear el error
 
+    yield
 
-@app.on_event("shutdown")
-async def shutdown_event():
-    """Evento de cierre de la aplicación"""
+    # Shutdown
     logger.info("👋 KnowLigo API cerrando...")
+
+
+# Crear app
+app = FastAPI(
+    title="KnowLigo RAG API",
+    description="API REST para chatbot de soporte IT con RAG",
+    version="1.0.0",
+    docs_url="/docs",
+    redoc_url="/redoc",
+    lifespan=lifespan,
+)
+
+# CORS middleware (para desarrollo)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # En producción, especificar dominios
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 @app.get("/", tags=["Root"])
