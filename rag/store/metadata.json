@@ -1,16 +1,17 @@
 {
-  "embedding_model": "all-MiniLM-L6-v2",
-  "chunk_size": 500,
-  "overlap": 50,
-  "documents": [
-    {
-      "file": "plans.md",
-      "sections": 6
-    },
-    {
-      "file": "sla.md",
-      "sections": 4
-    }
+  "version": "v1.0.0",
+  "created_at": "2026-02-10T19:38:38.898763",
+  "model_name": "all-MiniLM-L6-v2",
+  "embedding_dimension": 384,
+  "total_chunks": 25,
+  "total_vectors": 25,
+  "documents_indexed": [
+    "company.md",
+    "sla.md",
+    "plans.md",
+    "services.md",
+    "policies.md",
+    "faq.md"
   ],
-  "version": "v1.0.0"
+  "index_type": "IndexFlatL2"
 }
