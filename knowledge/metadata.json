@@ -1,0 +1,20 @@
+{
+  "domain": "IT Support Services",
+  "allowed_topics": [
+    "support",
+    "plans",
+    "sla",
+    "tickets",
+    "maintenance"
+  ],
+  "forbidden_topics": [
+    "security hacking",
+    "opinions",
+    "general technology advice",
+    "non-business topics"
+  ],
+  "response_style": {
+    "tone": "professional",
+    "max_words": 120
+  }
+}

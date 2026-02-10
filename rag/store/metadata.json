@@ -1,0 +1,16 @@
+{
+  "embedding_model": "all-MiniLM-L6-v2",
+  "chunk_size": 500,
+  "overlap": 50,
+  "documents": [
+    {
+      "file": "plans.md",
+      "sections": 6
+    },
+    {
+      "file": "sla.md",
+      "sections": 4
+    }
+  ],
+  "version": "v1.0.0"
+}
