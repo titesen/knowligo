@@ -1,0 +1,12 @@
+docs/company/.keep
+docs/policies/.keep
+docs/services/.keep
+docs/faq/.keep
+
+database/schema/.keep
+database/seeds/.keep
+database/sqlite/.keep
+
+n8n/workflows/.keep
+scripts/ingest/.keep
+scripts/utils/.keep

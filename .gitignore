@@ -1,0 +1,19 @@
+# n8n
+n8n/.n8n/
+n8n/credentials/
+
+# Databases
+database/sqlite/*.db
+
+# Vector store
+vector-store/
+
+# Docker volumes
+qdrant/
+ollama/
+
+# Environment
+.env
+
+# OS
+.DS_Store
