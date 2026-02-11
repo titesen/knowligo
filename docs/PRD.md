@@ -1,14 +1,9 @@
 # Product Requirements Document (PRD)
 # KnowLigo - RAG-Powered IT Support Chatbot
 
-**Versión:** 1.0  
-**Fecha:** 10 de febrero de 2026  
-**Autor:** Equipo KnowLigo  
-**Estado:** Activo
-
 ---
 
-## 📌 Resumen Ejecutivo
+## 📌 Resumen 
 
 **KnowLigo** es un chatbot inteligente de soporte IT para PyMEs que opera a través de WhatsApp Business, implementando tecnología RAG (Retrieval-Augmented Generation) para proporcionar respuestas precisas y contextuales sobre servicios de soporte técnico, planes, políticas y SLAs.
 
@@ -877,7 +872,7 @@ knowligo/
 ## 📞 Contacto y Soporte
 
 **Proyecto:** KnowLigo RAG Chatbot  
-**Repositorio:** https://github.com/tu-usuario/knowligo  
+**Repositorio:** https://github.com/titesen/knowligo  
 **Documentación:** [README.md](README.md)  
 **Issues:** GitHub Issues  
 **Discusiones:** GitHub Discussions
@@ -913,7 +908,3 @@ knowligo/
 | Versión | Fecha | Cambios | Autor |
 |---------|-------|---------|-------|
 | 1.0 | 2026-02-10 | Documento inicial | Equipo KnowLigo |
-
----
-
-**Fin del PRD v1.0**

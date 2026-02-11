@@ -86,7 +86,10 @@ Abre http://localhost:8000/docs para ver la documentación interactiva.
 ### 5. Desplegar con Docker
 
 ```powershell
-# Construir y levantar servicios
+# Opción A: Quick Start (todo automático)
+python scripts\quick_start.py
+
+# Opción B: Manual
 docker-compose up -d
 
 # Ver logs
@@ -94,6 +97,16 @@ docker-compose logs -f
 
 # Acceder a n8n
 # http://localhost:5678 (user: admin, pass: knowligo2026)
+```
+
+### 6. Validar instalación
+
+```powershell
+# Ejecuta validación completa del sistema
+python scripts\validate_demo.py
+
+# Revisa que todos los checks pasen ✅
+# Si algo falla, sigue las instrucciones de cada sección
 ```
 
 ## 📁 Estructura del Proyecto
@@ -129,7 +142,10 @@ knowligo/
 │   └── credentials/       # Config de credenciales
 ├── scripts/
 │   ├── test_api.py        # Tests automatizados
-│   └── utils/             # Utilidades
+│   ├── validate_demo.py   # Validación pre-demo
+│   ├── quick_start.py     # Inicio rápido de servicios
+│   ├── start.ps1          # Script PowerShell interactivo
+│   └── utils/             # Utilidades (init_db.py)
 ├── docker-compose.yml     # Orquestación de servicios
 ├── Dockerfile             # Imagen de la API
 └── requirements.txt       # Dependencias Python
