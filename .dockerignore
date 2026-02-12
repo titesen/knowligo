@@ -1,17 +1,69 @@
+# Python
 *.pyc
+*.pyo
+*.pyd
 __pycache__/
 .pytest_cache/
 .venv/
 venv/
+env/
 *.egg-info/
 dist/
 build/
-.DS_Store
+*.so
+
+# Environment
 .env
+.env.*
+!.env.example
+
+# Git
 .git/
 .gitignore
-*.md
-docs/
-scripts/
-*.db
+.gitattributes
+
+# IDE
 .vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Docker
+docker-compose.yml
+docker-compose.*.yml
+Dockerfile
+Dockerfile.*
+.dockerignore
+
+# Documentation
+*.md
+!README.md
+docs/
+
+# Scripts
+scripts/
+
+# N8n
+n8n/
+
+# OS
+.DS_Store
+Thumbs.db
+*.log
+
+# Database (producción usa volúmenes)
+*.db
+*.db-journal
+
+# Tests
+tests/
+test_*.py
+*_test.py
+.coverage
+.tox/
+
+# Temporal
+*.tmp
+*.temp
+.cache/

@@ -1,39 +1,70 @@
-# Dockerfile para KnowLigo RAG API
-FROM python:3.11-slim
+# =============================================================================
+# Multi-stage Dockerfile para KnowLigo RAG API
+# Optimizado para tamaño mínimo y máxima eficiencia
+# =============================================================================
 
-# Metadata
-LABEL maintainer="KnowLigo"
-LABEL description="RAG-powered IT support chatbot API"
+# -----------------------------------------------------------------------------
+# Stage 1: Builder - Instala dependencias
+# -----------------------------------------------------------------------------
+FROM python:3.11-slim-bookworm AS builder
 
-# Configurar directorio de trabajo
-WORKDIR /app
+WORKDIR /build
 
-# Instalar dependencias del sistema
-RUN apt-get update && apt-get install -y \
-    curl \
+# Instalar solo build dependencies necesarias
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc \
+    g++ \
     && rm -rf /var/lib/apt/lists/*
 
-# Copiar requirements
+# Copiar requirements y crear virtualenv
 COPY requirements.txt .
+RUN python -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
 
-# Instalar dependencias de Python
-RUN pip install --no-cache-dir -r requirements.txt
+# Instalar dependencias en virtualenv
+RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
+    pip install --no-cache-dir -r requirements.txt
 
-# Copiar código de la aplicación
-COPY rag/ ./rag/
-COPY api/ ./api/
-COPY knowledge/ ./knowledge/
-COPY database/ ./database/
+# -----------------------------------------------------------------------------
+# Stage 2: Runtime - Imagen final mínima
+# -----------------------------------------------------------------------------
+FROM python:3.11-slim-bookworm AS runtime
 
-# Crear directorios necesarios
-RUN mkdir -p /app/database/sqlite /app/rag/store
+# Metadata
+LABEL maintainer="KnowLigo" \
+      description="RAG-powered IT support chatbot API" \
+      version="1.0.0"
+
+WORKDIR /app
+
+# Copiar virtualenv desde builder
+COPY --from=builder /opt/venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH" \
+    PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1
+
+# Crear usuario non-root para seguridad
+RUN groupadd -r knowligo && useradd -r -g knowligo -u 1001 knowligo && \
+    mkdir -p /app/database/sqlite /app/rag/store && \
+    chown -R knowligo:knowligo /app
+
+# Copiar código (orden optimizado para layer caching)
+COPY --chown=knowligo:knowligo database/ ./database/
+COPY --chown=knowligo:knowligo knowledge/ ./knowledge/
+COPY --chown=knowligo:knowligo rag/ ./rag/
+COPY --chown=knowligo:knowligo api/ ./api/
+
+# Cambiar a usuario non-root
+USER knowligo
 
 # Exponer puerto
 EXPOSE 8000
 
-# Healthcheck
-HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-    CMD curl -f http://localhost:8000/health || exit 1
+# Healthcheck sin curl (usa Python requests)
+HEALTHCHECK --interval=30s --timeout=5s --start-period=40s --retries=3 \
+    CMD python -c "import requests; requests.get('http://localhost:8000/health', timeout=3).raise_for_status()" || exit 1
 
 # Comando de inicio
-CMD ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]
