@@ -28,10 +28,12 @@ function Test-DockerRunning {
 
 # Habilitar BuildKit para builds más rápidos
 function Enable-BuildKit {
-    Write-Host "⚡ Habilitando Docker BuildKit..." -ForegroundColor Green
+    Write-Host "⚡ Habilitando Docker BuildKit (requerido para optimizaciones)..." -ForegroundColor Green
     $env:DOCKER_BUILDKIT = 1
     $env:COMPOSE_DOCKER_CLI_BUILD = 1
-    $env:BUILDKIT_PROGRESS = "plain"
+    $env:BUILDKIT_PROGRESS = "auto"
+    # Habilitar inline cache para builds incremental
+    $env:BUILDKIT_INLINE_CACHE = 1
 }
 
 # Verificar archivo .env
@@ -72,14 +74,20 @@ function Clear-DockerResources {
 # Build modo desarrollo
 function Build-Dev {
     Write-Host "🔨 Construyendo en modo DESARROLLO..." -ForegroundColor Cyan
-    Write-Host "  - BuildKit habilitado: Sí" -ForegroundColor Gray
-    Write-Host "  - Parallel build: Sí" -ForegroundColor Gray
-    Write-Host "  - Cache: Habilitado`n" -ForegroundColor Gray
+    Write-Host "  - BuildKit: Habilitado (cache inline)" -ForegroundColor Gray
+    Write-Host "  - Multi-stage: 2 stages optimizados" -ForegroundColor Gray
+    Write-Host "  - Wheels: Pre-compilados (no compilation)" -ForegroundColor Gray
+    Write-Host "  - Cache layers: Máximo reuso`n" -ForegroundColor Gray
     
     docker-compose build --parallel
     
     if ($LASTEXITCODE -eq 0) {
         Write-Host "`n✅ Build completado exitosamente" -ForegroundColor Green
+        
+        # Mostrar tamaño de imagen
+        $imageSize = docker images knowligo-api:latest --format "{{.Size}}"
+        Write-Host "📦 Tamaño de imagen API: $imageSize" -ForegroundColor Cyan
+        
         Write-Host "`n🚀 Iniciando contenedores..." -ForegroundColor Cyan
         docker-compose up -d
         

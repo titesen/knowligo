@@ -1,20 +1,24 @@
-# Core RAG dependencies
-sentence-transformers==2.5.1
-faiss-cpu==1.13.2
+# =============================================================================
+# KnowLigo - Dependencies (Optimized for Docker builds)
+# =============================================================================
+# Orden optimizado: frameworks ligeros primero, ML libraries después
+
+# Web framework for API (ligero, instalar primero)
+fastapi==0.109.2
+uvicorn[standard]==0.27.1
+pydantic==2.6.1
+requests==2.31.0
+python-dotenv==1.0.1
 markdown==3.5.2
 
 # LLM API
 groq==0.4.2
 
-# Environment and configuration
-python-dotenv==1.0.1
+# Core RAG dependencies (pesadas, wheels pre-compilados disponibles)
+faiss-cpu==1.13.2
+sentence-transformers==2.5.1
 
-# Web framework for API
-fastapi>=0.109.2
-uvicorn>=0.27.1
-pydantic>=2.6.1
-
-# HTTP requests
-requests==2.31.0
-
-# Note: sqlite3 comes built-in with Python, no installation needed
+# Note: sqlite3 viene built-in con Python, no requiere instalación
+# Note: sentence-transformers trae como dependencias:
+#   - torch, transformers, numpy, scipy, scikit-learn, etc.
+#   - Usa wheels pre-compilados cuando están disponibles

@@ -1,16 +1,24 @@
-# Python
+# Python bytecode y cache
 *.pyc
 *.pyo
 *.pyd
 __pycache__/
 .pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.py[cod]
+*$py.class
+
+# Entornos virtuales
 .venv/
 venv/
 env/
+ENV/
 *.egg-info/
 dist/
 build/
 *.so
+.Python
 
 # Environment
 .env
@@ -52,9 +60,12 @@ n8n/
 Thumbs.db
 *.log
 
-# Database (producción usa volúmenes)
+# Database (producción usa volúmenes, no incluir en imagen)
 *.db
 *.db-journal
+*.sqlite
+*.sqlite3
+database/sqlite/*.db
 
 # Tests
 tests/
@@ -63,7 +74,24 @@ test_*.py
 .coverage
 .tox/
 
-# Temporal
+# Temporal y cache
 *.tmp
 *.temp
 .cache/
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb
+
+# Datos grandes que no van en imagen
+*.csv
+*.parquet
+*.h5
+*.pkl
+*.pickle
+# Excepto los índices necesarios del RAG
+!rag/store/*.pkl
+!rag/store/*.index
+!rag/store/*.json
