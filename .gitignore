@@ -1,3 +1,21 @@
+# Python
+.venv/
+venv/
+env/
+ENV/
+__pycache__/
+*.py[cod]
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.mypy_cache/
+
 # n8n
 n8n/.n8n/
 n8n/credentials/
@@ -14,8 +32,17 @@ ollama/
 
 # Environment
 .env
+.env.*
+!.env.example
 
 # OS
 .DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
 
 
