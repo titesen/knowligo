@@ -11,7 +11,7 @@ import os
 import sys
 from pathlib import Path
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, HTTPException, status
+from fastapi import FastAPI, HTTPException, status, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 import logging
@@ -148,6 +148,67 @@ async def health_check():
         components["pipeline"] = f"error: {str(e)}"
 
     return HealthResponse(status=overall_status, version="1.0.0", components=components)
+
+
+@app.get("/webhook", tags=["Webhook"])
+async def verify_webhook(request: Request):
+    """
+    Verificación del webhook de WhatsApp (Meta).
+
+    Meta envía un GET request con:
+    - hub.mode=subscribe
+    - hub.verify_token=<tu_token>
+    - hub.challenge=<string_aleatorio>
+
+    Debemos validar el token y devolver el challenge.
+    """
+    mode = request.query_params.get("hub.mode")
+    token = request.query_params.get("hub.verify_token")
+    challenge = request.query_params.get("hub.challenge")
+
+    verify_token = os.getenv("WHATSAPP_VERIFY_TOKEN", "knowligo_webhook_2026")
+
+    if mode == "subscribe" and token == verify_token:
+        logger.info("✅ Webhook verificado correctamente")
+        return int(challenge)
+    else:
+        logger.warning(f"❌ Webhook verification failed. Token: {token}")
+        raise HTTPException(status_code=403, detail="Verification failed")
+
+
+@app.post("/webhook", tags=["Webhook"])
+async def handle_webhook(request: Request):
+    """
+    Recibe mensajes de WhatsApp desde Meta.
+
+    Procesa el mensaje y envía la respuesta del RAG.
+    """
+    try:
+        body = await request.json()
+        logger.info(f"📩 Webhook recibido: {body}")
+
+        # Validar que sea un mensaje
+        if body.get("object") == "whatsapp_business_account":
+            for entry in body.get("entry", []):
+                for change in entry.get("changes", []):
+                    value = change.get("value", {})
+
+                    # Verificar que hay mensajes
+                    if "messages" in value:
+                        for message in value["messages"]:
+                            from_number = message["from"]
+                            message_body = message.get("text", {}).get("body", "")
+
+                            logger.info(f"📱 Mensaje de {from_number}: {message_body}")
+
+                            # Aquí procesarías el mensaje con tu RAG
+                            # Por ahora solo registramos que llegó
+
+        return {"status": "ok"}
+
+    except Exception as e:
+        logger.error(f"Error procesando webhook: {e}", exc_info=True)
+        return {"status": "error", "message": str(e)}
 
 
 @app.post("/query", response_model=QueryResponse, tags=["Query"])

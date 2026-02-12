@@ -1,22 +1,22 @@
 # =============================================================================
-# KnowLigo - Dependencies (Optimized for Docker builds)
+# KnowLigo - Dependencies
+# Requiere: Python 3.11 o 3.12 (wheels pre-compilados disponibles)
 # =============================================================================
-# Orden optimizado: frameworks ligeros primero, ML libraries después
 
-# Web framework for API (ligero, instalar primero)
-fastapi==0.109.2
-uvicorn[standard]==0.27.1
-pydantic==2.6.1
-requests==2.31.0
+# Web framework
+fastapi==0.115.0
+uvicorn[standard]==0.32.1
+pydantic==2.9.2
+requests==2.32.3
 python-dotenv==1.0.1
-markdown==3.5.2
+markdown==3.7
 
 # LLM API
-groq==0.4.2
+groq==0.11.0
 
-# Core RAG dependencies (pesadas, wheels pre-compilados disponibles)
+# RAG dependencies
 faiss-cpu==1.13.2
-sentence-transformers==2.5.1
+sentence-transformers==3.3.1
 
 # Note: sqlite3 viene built-in con Python, no requiere instalación
 # Note: sentence-transformers trae como dependencias:
