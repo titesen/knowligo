@@ -1,5 +1,6 @@
 services:
   # n8n - Workflow automation platform
+  # Se conecta al API que corre en host (puerto 8000)
   n8n:
     image: n8nio/n8n:1.24.1
     container_name: knowligo_n8n
@@ -21,11 +22,8 @@ services:
     volumes:
       - n8n_data:/home/node/.n8n
       - ./n8n/workflows:/home/node/.n8n/workflows:ro
-    networks:
-      - knowligo_network
-    depends_on:
-      api:
-        condition: service_healthy
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     healthcheck:
       test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:5678/healthz || exit 1"]
       interval: 30s
@@ -33,46 +31,7 @@ services:
       retries: 3
       start_period: 30s
 
-  # KnowLigo RAG API
-  api:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      target: runtime
-      args:
-        - BUILDKIT_INLINE_CACHE=1
-    image: knowligo-api:latest
-    container_name: knowligo_api
-    restart: unless-stopped
-    ports:
-      - "8000:8000"
-    environment:
-      GROQ_API_KEY: ${GROQ_API_KEY}
-      WHATSAPP_TOKEN: ${WHATSAPP_TOKEN}
-      WHATSAPP_PHONE_NUMBER_ID: ${WHATSAPP_PHONE_NUMBER_ID}
-      MAX_MESSAGE_LENGTH: ${MAX_MESSAGE_LENGTH:-120}
-      MAX_QUERIES_PER_HOUR: ${MAX_QUERIES_PER_HOUR:-10}
-      LLM_MODEL: ${LLM_MODEL:-mixtral-8x7b-32768}
-    volumes:
-      - api_data:/app/database/sqlite
-      - ./rag/store:/app/rag/store:ro
-      - ./knowledge:/app/knowledge:ro
-    networks:
-      - knowligo_network
-    healthcheck:
-      test: ["CMD-SHELL", "python -c 'import socket; s=socket.socket(); s.settimeout(2); s.connect((\"127.0.0.1\", 8000)); s.close()' || exit 1"]
-      interval: 30s
-      timeout: 3s
-      retries: 3
-      start_period: 40s
-
-networks:
-  knowligo_network:
-    driver: bridge
-
 volumes:
   n8n_data:
-    driver: local
-  api_data:
     driver: local
 
