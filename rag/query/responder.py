@@ -52,7 +52,7 @@ class GroqResponder:
         self.client = Groq(api_key=api_key)
 
         # Configurar modelo
-        self.model = model or os.getenv("LLM_MODEL", "mixtral-8x7b-32768")
+        self.model = model or os.getenv("LLM_MODEL", "llama-3.3-70b-versatile")
 
         # Configurar límite de palabras
         self.max_words = max_words or int(os.getenv("MAX_MESSAGE_LENGTH", "120"))

@@ -199,14 +199,25 @@ async def send_whatsapp_message(to: str, message: str):
         )
         return False
 
-    url = f"https://graph.facebook.com/v18.0/{phone_number_id}/messages"
+    # Normalizar número argentino: WhatsApp envía 5493794285297 (con 9)
+    # pero Meta puede requerir 543794285297 (sin 9). Intentar ambos formatos.
+    normalized_to = to
+    is_argentine_mobile = to.startswith("549") and len(to) == 13
+    if is_argentine_mobile:
+        # Probar sin el 9 primero (formato que Meta registra)
+        normalized_to = "54" + to[3:]
+        logger.info(
+            f"📱 Número argentino detectado: {to} → normalizado a {normalized_to}"
+        )
+
+    url = f"https://graph.facebook.com/v22.0/{phone_number_id}/messages"
     headers = {
         "Authorization": f"Bearer {whatsapp_token}",
         "Content-Type": "application/json",
     }
     payload = {
         "messaging_product": "whatsapp",
-        "to": to,
+        "to": normalized_to,
         "type": "text",
         "text": {"body": message},
     }
@@ -215,12 +226,24 @@ async def send_whatsapp_message(to: str, message: str):
         async with httpx.AsyncClient(timeout=15.0) as client:
             response = await client.post(url, json=payload, headers=headers)
             if response.status_code == 200:
-                logger.info(f"✅ Mensaje enviado a {to}")
+                logger.info(f"✅ Mensaje enviado a {normalized_to}")
                 return True
             else:
-                logger.error(
-                    f"❌ Error enviando mensaje: {response.status_code} - {response.text}"
+                logger.warning(
+                    f"⚠️ Error con {normalized_to}: {response.status_code} - {response.text}"
                 )
+                # Si falló con formato sin 9, intentar con el original (con 9)
+                if normalized_to != to:
+                    logger.info(f"🔄 Reintentando con formato original: {to}")
+                    payload["to"] = to
+                    response2 = await client.post(url, json=payload, headers=headers)
+                    if response2.status_code == 200:
+                        logger.info(f"✅ Mensaje enviado a {to} (formato original)")
+                        return True
+                    else:
+                        logger.error(
+                            f"❌ Error enviando mensaje: {response2.status_code} - {response2.text}"
+                        )
                 return False
     except Exception as e:
         logger.error(f"❌ Excepción enviando mensaje WhatsApp: {e}")

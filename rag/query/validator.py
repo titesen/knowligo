@@ -134,6 +134,29 @@ class QueryValidator:
         if any(keyword in query_lower for keyword in general_keywords):
             contains_allowed_topic = True
 
+        # Permitir saludos y frases cortas de cortesía
+        greeting_keywords = [
+            "hola",
+            "hello",
+            "hi",
+            "buenos días",
+            "buenas tardes",
+            "buenas noches",
+            "buen día",
+            "qué tal",
+            "cómo estás",
+            "ayuda",
+            "ayudar",
+            "me puedes",
+            "puedes ayudar",
+            "necesito ayuda",
+            "gracias",
+            "info",
+            "información",
+        ]
+        if any(keyword in query_lower for keyword in greeting_keywords):
+            contains_allowed_topic = True
+
         if not contains_allowed_topic:
             return (
                 False,
