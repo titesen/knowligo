@@ -57,10 +57,10 @@ class QueryValidator:
         if not query.strip():
             return False, "La consulta está vacía"
 
-        # 2. Verificar que no contenga topics prohibidos
+        # 2. Verificar que no contenga topics prohibidos (coincidencia de frase completa)
         for forbidden in self.forbidden_topics:
-            keywords = forbidden.lower().split()
-            if any(keyword in query_lower for keyword in keywords):
+            forbidden_lower = forbidden.lower()
+            if forbidden_lower in query_lower:
                 return (
                     False,
                     f"Lo siento, no puedo ayudar con consultas sobre {forbidden}. "
@@ -75,39 +75,117 @@ class QueryValidator:
                 "ayuda",
                 "asistencia",
                 "problema",
-                "issue",
+                "incidencia",
                 "support",
                 "help",
+                "técnico",
+                "remoto",
+                "presencial",
             ],
             "plans": [
                 "plan",
                 "planes",
                 "paquete",
                 "servicio",
-                "tier",
-                "basic",
-                "professional",
-                "enterprise",
+                "básico",
+                "profesional",
+                "empresarial",
+                "precio",
+                "costo",
+                "cuánto",
+                "cuanto",
+                "contratar",
+                "cotización",
             ],
             "sla": [
                 "sla",
                 "tiempo",
                 "respuesta",
+                "resolución",
                 "prioridad",
                 "urgente",
-                "critical",
-                "high",
-                "medium",
-                "low",
+                "crítica",
+                "alta",
+                "media",
+                "baja",
+                "disponibilidad",
+                "compensación",
             ],
-            "tickets": ["ticket", "incidente", "caso", "reporte", "solicitud"],
+            "tickets": [
+                "ticket",
+                "incidente",
+                "caso",
+                "reporte",
+                "solicitud",
+                "reclamo",
+                "queja",
+                "reportar",
+                "estado",
+            ],
             "maintenance": [
                 "mantenimiento",
                 "preventivo",
-                "actualizacion",
+                "actualización",
                 "backup",
+                "respaldo",
                 "maintenance",
                 "update",
+                "monitoreo",
+            ],
+            "company": [
+                "knowligo",
+                "empresa",
+                "compañía",
+                "equipo",
+                "oficina",
+                "contacto",
+                "teléfono",
+                "email",
+                "dirección",
+                "horario",
+                "quiénes",
+                "quienes",
+            ],
+            "billing": [
+                "factura",
+                "facturación",
+                "pago",
+                "cobro",
+                "mora",
+                "precio",
+                "ajuste",
+                "cancelar",
+                "cancelación",
+            ],
+            "policies": [
+                "política",
+                "políticas",
+                "privacidad",
+                "datos",
+                "confidencialidad",
+                "exclusión",
+                "exclusiones",
+                "condiciones",
+                "términos",
+            ],
+            "backup": [
+                "backup",
+                "respaldo",
+                "veeam",
+                "restauración",
+                "recuperación",
+                "drp",
+                "desastre",
+            ],
+            "security_services": [
+                "seguridad",
+                "antivirus",
+                "firewall",
+                "ssl",
+                "certificado",
+                "vpn",
+                "ransomware",
+                "protección",
             ],
         }
 
@@ -160,8 +238,9 @@ class QueryValidator:
         if not contains_allowed_topic:
             return (
                 False,
-                f"Lo siento, solo puedo responder preguntas sobre {self.domain}. "
-                f"Puedo ayudarte con: planes de servicio, SLA, tickets de soporte y mantenimiento.",
+                f"Lo siento, solo puedo responder preguntas sobre los servicios de KnowLigo. "
+                f"Puedo ayudarte con: planes de servicio, precios, SLA, tickets de soporte, "
+                f"mantenimiento, backup, políticas y facturación.",
             )
 
         # 4. Query es válida

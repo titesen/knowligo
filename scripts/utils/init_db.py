@@ -66,22 +66,6 @@ def init_database():
             count = cursor.fetchone()[0]
             print(f"   - {table_name}: {count} registros")
 
-        # Crear tabla adicional para logs de queries
-        print("\n📝 Creando tabla de logs...")
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS query_logs (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                user_id TEXT NOT NULL,
-                query TEXT NOT NULL,
-                intent TEXT,
-                response TEXT,
-                timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-                response_time_ms INTEGER
-            );
-        """)
-        conn.commit()
-        print("✅ Tabla query_logs creada")
-
     except Exception as e:
         print(f"\n❌ Error al inicializar la base de datos: {e}")
         conn.rollback()

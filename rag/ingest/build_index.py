@@ -25,6 +25,12 @@ except ImportError:
 
 from chunker import process_documents
 
+# Intentar importar el generador de docs desde DB
+try:
+    from db_to_docs import generate_db_docs
+except ImportError:
+    generate_db_docs = None
+
 
 class IndexBuilder:
     """Clase para construir y guardar el índice FAISS"""
@@ -157,10 +163,40 @@ def build_knowledge_base(
     print("🚀 Construyendo Base de Conocimiento de KnowLigo")
     print("=" * 60 + "\n")
 
-    # Paso 1: Procesar documentos en chunks
+    # Paso 0: Generar documentos desde la DB (datos públicos)
+    if generate_db_docs is not None:
+        print("PASO 0: Generando documentos desde la base de datos")
+        print("-" * 60)
+        try:
+            generate_db_docs()
+        except Exception as e:
+            print(f"⚠️  Error generando docs desde DB (continuando sin ellos): {e}")
+        print(f"\n{'=' * 60}\n")
+    else:
+        print("ℹ️  db_to_docs no disponible, solo se indexarán documentos estáticos\n")
+
+    # Paso 1: Procesar documentos en chunks (directorio principal)
     print("PASO 1: Procesamiento de documentos")
     print("-" * 60)
     chunks = process_documents(chunk_size=chunk_size, overlap=overlap)
+
+    # Paso 1b: Procesar también documentos generados desde la DB
+    script_dir = Path(__file__).resolve().parent
+    project_root = script_dir.parent.parent
+    db_docs_dir = project_root / "knowledge" / "documents" / "db_generated"
+    if db_docs_dir.exists() and any(db_docs_dir.glob("*.md")):
+        print(f"\n📂 Procesando documentos generados desde DB...")
+        db_chunks = process_documents(
+            docs_path=str(db_docs_dir), chunk_size=chunk_size, overlap=overlap
+        )
+        # Reasignar IDs para que sean consecutivos
+        offset = len(chunks)
+        for chunk in db_chunks:
+            chunk["id"] = chunk["id"] + offset
+        chunks.extend(db_chunks)
+        print(f"✅ Total combinado: {len(chunks)} chunks")
+    else:
+        print("ℹ️  No hay documentos generados desde DB")
 
     if not chunks:
         print("❌ No se encontraron chunks para indexar")

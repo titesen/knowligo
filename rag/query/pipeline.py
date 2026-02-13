@@ -47,8 +47,11 @@ class RAGPipeline:
 
         # Rate limiting config
         self.max_queries_per_hour = max_queries_per_hour or int(
-            os.getenv("MAX_QUERIES_PER_HOUR", "10")
+            os.getenv("MAX_QUERIES_PER_HOUR", "15")
         )
+
+        # Retrieval config
+        self.top_k = int(os.getenv("TOP_K_RETRIEVAL", "5"))
 
         # Inicializar componentes
         print("🚀 Inicializando RAG Pipeline...")
@@ -141,7 +144,7 @@ class RAGPipeline:
 
             # 4. Recuperar contexto relevante
             print(f"🔍 Buscando contexto para: '{user_query[:50]}...'")
-            retrieved_chunks = self.retriever.retrieve(user_query, top_k=3)
+            retrieved_chunks = self.retriever.retrieve(user_query, top_k=self.top_k)
 
             print(f"📚 Recuperados {len(retrieved_chunks)} chunks")
 

@@ -1,20 +1,34 @@
 {
-  "domain": "IT Support Services",
+  "domain": "Servicios de Soporte IT",
+  "company_name": "KnowLigo",
+  "language": "es",
   "allowed_topics": [
     "support",
     "plans",
     "sla",
     "tickets",
-    "maintenance"
+    "maintenance",
+    "company",
+    "billing",
+    "policies",
+    "backup",
+    "security_services"
   ],
   "forbidden_topics": [
-    "security hacking",
-    "opinions",
-    "general technology advice",
-    "non-business topics"
+    "hacking",
+    "piratería",
+    "cracking",
+    "malware creation",
+    "opiniones políticas",
+    "deportes",
+    "entretenimiento",
+    "recetas",
+    "desarrollo de software",
+    "inversiones financieras"
   ],
   "response_style": {
-    "tone": "professional",
-    "max_words": 120
+    "tone": "professional_formal",
+    "language": "es",
+    "max_words": 150
   }
 }
