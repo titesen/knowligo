@@ -37,7 +37,7 @@ GROQ_API_KEY=gsk_tu_key_aqui
 # WhatsApp (https://developers.facebook.com)
 WHATSAPP_PHONE_NUMBER_ID=123456789012345
 WHATSAPP_TOKEN=EAAtu_token_aqui
-WHATSAPP_VERIFY_TOKEN=knowligo_webhook_verify_token
+WHATSAPP_VERIFY_TOKEN=knowligo_webhook_2026
 ```
 
 ### 3️⃣ Inicializar base de datos y vectorizar
@@ -66,8 +66,19 @@ npx n8n
 
 ### 5️⃣ Configurar Ngrok
 
+> **IMPORTANTE**: Elige UNA de las dos opciones (A o B) según cómo quieras manejar el webhook.
+
+#### Opción A: Webhook directo por FastAPI (RECOMENDADO - más simple)
+
 ```powershell
-# Nueva terminal
+# Ngrok apunta a la API FastAPI (puerto 8000)
+ngrok http 8000
+```
+
+#### Opción B: Webhook por n8n (más complejo)
+
+```powershell
+# Ngrok apunta a n8n (puerto 5678)
 ngrok http 5678
 ```
 
@@ -77,12 +88,20 @@ Copia la URL HTTPS (ej: `https://abc123.ngrok-free.app`)
 
 1. Ve a https://developers.facebook.com/apps
 2. Tu app → WhatsApp → Configuration → Webhook
-3. **Callback URL**: `https://TU-URL-NGROK.ngrok-free.app/webhook/whatsapp-webhook`
-4. **Verify token**: `knowligo_webhook_verify_token`
+
+**Si elegiste Opción A (FastAPI directo):**
+3. **Callback URL**: `https://TU-URL-NGROK.ngrok-free.app/webhook`
+4. **Verify token**: `knowligo_webhook_2026`
 5. Click **"Verify and save"**
 6. Suscribirse a **"messages"**
 
-### 7️⃣ Configurar n8n
+**Si elegiste Opción B (n8n):**
+3. **Callback URL**: `https://TU-URL-NGROK.ngrok-free.app/webhook/whatsapp-webhook`
+4. **Verify token**: `knowligo_webhook_2026`
+5. Click **"Verify and save"**
+6. Suscribirse a **"messages"**
+
+### 7️⃣ Configurar n8n (solo si elegiste Opción B)
 
 1. Abre http://localhost:5678 (admin / knowligo2026)
 2. Credentials → Add

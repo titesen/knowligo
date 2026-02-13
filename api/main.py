@@ -3,17 +3,19 @@ FastAPI Application - API REST para KnowLigo RAG Chatbot
 
 Expone endpoints para:
 - Procesar queries del chatbot
+- Webhook de WhatsApp (verificación + mensajes)
 - Health checks
 - Métricas básicas
 """
 
 import os
 import sys
+import httpx
 from pathlib import Path
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, status, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, PlainTextResponse
 import logging
 
 # Agregar directorio raíz al path para imports
@@ -160,7 +162,7 @@ async def verify_webhook(request: Request):
     - hub.verify_token=<tu_token>
     - hub.challenge=<string_aleatorio>
 
-    Debemos validar el token y devolver el challenge.
+    Debemos validar el token y devolver el challenge como texto plano.
     """
     mode = request.query_params.get("hub.mode")
     token = request.query_params.get("hub.verify_token")
@@ -168,12 +170,61 @@ async def verify_webhook(request: Request):
 
     verify_token = os.getenv("WHATSAPP_VERIFY_TOKEN", "knowligo_webhook_2026")
 
+    logger.info(
+        f"🔐 Webhook verification request: mode={mode}, token={'***' if token else 'None'}, challenge={challenge}"
+    )
+    logger.info(f"🔐 Expected verify token: {verify_token}")
+
     if mode == "subscribe" and token == verify_token:
         logger.info("✅ Webhook verificado correctamente")
-        return int(challenge)
+        # Meta espera SOLO el challenge como texto plano
+        return PlainTextResponse(content=challenge, status_code=200)
     else:
-        logger.warning(f"❌ Webhook verification failed. Token: {token}")
+        logger.warning(
+            f"❌ Webhook verification failed. mode={mode}, token_match={token == verify_token}"
+        )
         raise HTTPException(status_code=403, detail="Verification failed")
+
+
+async def send_whatsapp_message(to: str, message: str):
+    """
+    Envía un mensaje de WhatsApp usando la Cloud API de Meta.
+    """
+    phone_number_id = os.getenv("WHATSAPP_PHONE_NUMBER_ID")
+    whatsapp_token = os.getenv("WHATSAPP_TOKEN")
+
+    if not phone_number_id or not whatsapp_token:
+        logger.error(
+            "❌ WHATSAPP_PHONE_NUMBER_ID o WHATSAPP_TOKEN no configurados en .env"
+        )
+        return False
+
+    url = f"https://graph.facebook.com/v18.0/{phone_number_id}/messages"
+    headers = {
+        "Authorization": f"Bearer {whatsapp_token}",
+        "Content-Type": "application/json",
+    }
+    payload = {
+        "messaging_product": "whatsapp",
+        "to": to,
+        "type": "text",
+        "text": {"body": message},
+    }
+
+    try:
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            response = await client.post(url, json=payload, headers=headers)
+            if response.status_code == 200:
+                logger.info(f"✅ Mensaje enviado a {to}")
+                return True
+            else:
+                logger.error(
+                    f"❌ Error enviando mensaje: {response.status_code} - {response.text}"
+                )
+                return False
+    except Exception as e:
+        logger.error(f"❌ Excepción enviando mensaje WhatsApp: {e}")
+        return False
 
 
 @app.post("/webhook", tags=["Webhook"])
@@ -181,28 +232,62 @@ async def handle_webhook(request: Request):
     """
     Recibe mensajes de WhatsApp desde Meta.
 
-    Procesa el mensaje y envía la respuesta del RAG.
+    Procesa el mensaje a través del pipeline RAG y envía la respuesta
+    de vuelta al usuario por WhatsApp.
     """
     try:
         body = await request.json()
-        logger.info(f"📩 Webhook recibido: {body}")
+        logger.info(f"📩 Webhook POST recibido")
 
-        # Validar que sea un mensaje
-        if body.get("object") == "whatsapp_business_account":
-            for entry in body.get("entry", []):
-                for change in entry.get("changes", []):
-                    value = change.get("value", {})
+        # Validar que sea un evento de WhatsApp Business
+        if body.get("object") != "whatsapp_business_account":
+            logger.info("⏭️ Evento ignorado (no es whatsapp_business_account)")
+            return {"status": "ignored"}
 
-                    # Verificar que hay mensajes
-                    if "messages" in value:
-                        for message in value["messages"]:
-                            from_number = message["from"]
-                            message_body = message.get("text", {}).get("body", "")
+        for entry in body.get("entry", []):
+            for change in entry.get("changes", []):
+                value = change.get("value", {})
 
-                            logger.info(f"📱 Mensaje de {from_number}: {message_body}")
+                # Ignorar si no hay mensajes (puede ser status update, etc.)
+                if "messages" not in value:
+                    continue
 
-                            # Aquí procesarías el mensaje con tu RAG
-                            # Por ahora solo registramos que llegó
+                for message in value["messages"]:
+                    # Solo procesar mensajes de texto
+                    if message.get("type") != "text":
+                        logger.info(
+                            f"⏭️ Mensaje no-texto ignorado: tipo={message.get('type')}"
+                        )
+                        continue
+
+                    from_number = message["from"]
+                    message_body = message.get("text", {}).get("body", "")
+                    message_id = message.get("id", "")
+
+                    logger.info(f"📱 Mensaje de {from_number}: {message_body}")
+
+                    # Procesar a través del pipeline RAG
+                    try:
+                        pipeline = get_pipeline()
+                        result = pipeline.process_query(
+                            user_query=message_body,
+                            user_id=from_number,
+                        )
+
+                        if result["success"]:
+                            response_text = result["response"]
+                        else:
+                            response_text = result.get(
+                                "response",
+                                "Disculpa, no pude procesar tu consulta. Por favor, intenta de nuevo.",
+                            )
+
+                    except Exception as e:
+                        logger.error(f"❌ Error en RAG pipeline: {e}", exc_info=True)
+                        response_text = "Disculpa, tengo problemas técnicos en este momento. Por favor, intenta nuevamente en unos momentos."
+
+                    # Enviar respuesta por WhatsApp
+                    await send_whatsapp_message(from_number, response_text)
 
         return {"status": "ok"}
 

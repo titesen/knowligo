@@ -4,8 +4,8 @@
     {
       "parameters": {
         "path": "whatsapp-webhook",
-        "options": {},
-        "responseMode": "responseNode"
+        "responseMode": "responseNode",
+        "options": {}
       },
       "id": "webhook-trigger",
       "name": "WhatsApp Webhook",
@@ -45,7 +45,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Webhook Verification para WhatsApp Cloud API\nconst query = $input.item.json.query || {};\nconst verifyToken = query['hub.verify_token'];\nconst expectedToken = $env.WHATSAPP_VERIFY_TOKEN || 'knowligo_webhook_verify_token';\nconst challenge = query['hub.challenge'];\n\nif (verifyToken === expectedToken && challenge) {\n  return {\n    challenge: challenge,\n    verified: true\n  };\n} else {\n  throw new Error('Verification failed: token mismatch');\n}"
+        "jsCode": "// Webhook Verification para WhatsApp Cloud API\nconst query = $input.item.json.query || {};\nconst verifyToken = query['hub.verify_token'];\nconst expectedToken = 'knowligo_webhook_2026';\nconst challenge = query['hub.challenge'];\n\nconsole.log('Verify token received:', verifyToken);\nconsole.log('Expected token:', expectedToken);\nconsole.log('Challenge:', challenge);\n\nif (verifyToken === expectedToken && challenge) {\n  return [{\n    json: {\n      challenge: challenge\n    }\n  }];\n} else {\n  throw new Error('Verification failed: token mismatch or no challenge');\n}"
       },
       "id": "verify-token",
       "name": "Verify Token",
@@ -56,7 +56,10 @@
     {
       "parameters": {
         "respondWith": "text",
-        "responseBody": "={{ $json.challenge }}"
+        "responseBody": "={{ $json.challenge }}",
+        "options": {
+          "responseCode": 200
+        }
       },
       "id": "respond-verification",
       "name": "Respond Verification",
@@ -96,7 +99,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Extraer datos del webhook de WhatsApp\nconst webhookData = $input.item.json.body;\n\ntry {\n  const messages = webhookData.entry[0].changes[0].value.messages;\n  const contacts = webhookData.entry[0].changes[0].value.contacts;\n  \n  if (messages && messages.length > 0) {\n    const message = messages[0];\n    const contact = contacts[0];\n    \n    // Solo procesar mensajes de texto\n    if (message.type !== 'text') {\n      return null;\n    }\n    \n    return {\n      user_id: message.from,\n      message: message.text.body,\n      user_name: contact.profile.name,\n      timestamp: message.timestamp,\n      message_id: message.id\n    };\n  }\n} catch (error) {\n  console.error('Error extracting WhatsApp data:', error);\n  return null;\n}\n\nreturn null;"
+        "jsCode": "// Extraer datos del webhook de WhatsApp\nconst webhookData = $input.item.json.body;\n\ntry {\n  const messages = webhookData.entry[0].changes[0].value.messages;\n  const contacts = webhookData.entry[0].changes[0].value.contacts;\n  \n  if (messages && messages.length > 0) {\n    const message = messages[0];\n    const contact = contacts[0];\n    \n    // Solo procesar mensajes de texto\n    if (message.type !== 'text') {\n      return [{ json: { skip: true } }];\n    }\n    \n    return [{\n      json: {\n        user_id: message.from,\n        message: message.text.body,\n        user_name: contact.profile.name,\n        timestamp: message.timestamp,\n        message_id: message.id\n      }\n    }];\n  }\n} catch (error) {\n  console.error('Error extracting WhatsApp data:', error);\n}\n\nreturn [{ json: { skip: true } }];"
       },
       "id": "extract-data",
       "name": "Extract Message Data",
@@ -107,13 +110,13 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "http://api:8000/query",
+        "url": "http://host.docker.internal:8000/query",
         "authentication": "none",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"user_id\": \"{{ $json.user_id }}\",\n  \"message\": \"{{ $json.message }}\"\n}",
+        "jsonBody": "={ \"user_id\": \"{{ $json.user_id }}\", \"message\": \"{{ $json.message }}\" }",
         "options": {
-          "timeout": 15000
+          "timeout": 30000
         }
       },
       "id": "call-rag-api",
@@ -159,7 +162,7 @@
         "nodeCredentialType": "httpHeaderAuth",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"messaging_product\": \"whatsapp\",\n  \"to\": \"{{ $('Extract Message Data').item.json.user_id }}\",\n  \"type\": \"text\",\n  \"text\": {\n    \"body\": \"{{ $json.response }}\"\n  }\n}",
+        "jsonBody": "={ \"messaging_product\": \"whatsapp\", \"to\": \"{{ $('Extract Message Data').item.json.user_id }}\", \"type\": \"text\", \"text\": { \"body\": \"{{ $json.response }}\" } }",
         "options": {}
       },
       "id": "send-whatsapp-success",
@@ -182,7 +185,7 @@
         "nodeCredentialType": "httpHeaderAuth",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"messaging_product\": \"whatsapp\",\n  \"to\": \"{{ $('Extract Message Data').item.json.user_id }}\",\n  \"type\": \"text\",\n  \"text\": {\n    \"body\": \"{{ $json.response || 'Disculpa, tengo problemas técnicos en este momento. Por favor, intenta nuevamente en unos momentos.' }}\"\n  }\n}",
+        "jsonBody": "={ \"messaging_product\": \"whatsapp\", \"to\": \"{{ $('Extract Message Data').item.json.user_id }}\", \"type\": \"text\", \"text\": { \"body\": \"Disculpa, tengo problemas técnicos en este momento. Por favor, intenta nuevamente en unos momentos.\" } }",
         "options": {}
       },
       "id": "send-whatsapp-error",
@@ -349,6 +352,6 @@
   "staticData": null,
   "tags": [],
   "triggerCount": 1,
-  "updatedAt": "2026-02-10T00:00:00.000Z",
-  "versionId": "2.0.0"
+  "updatedAt": "2026-02-12T00:00:00.000Z",
+  "versionId": "3.0.0"
 }

@@ -109,7 +109,7 @@ https://abcd-1234-5678.ngrok-free.app/webhook/whatsapp-webhook
 
 **Verify token**:
 ```
-knowligo_webhook_verify_token
+knowligo_webhook_2026
 ```
 (Debe coincidir exactamente con `WHATSAPP_VERIFY_TOKEN` en `.env`)
 
