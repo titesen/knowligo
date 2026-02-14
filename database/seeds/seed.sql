@@ -8,15 +8,17 @@ INSERT INTO plans (name, description, price_ars, max_tickets_month, support_hour
     999000, NULL, '24/7 los 365 días', 1, 1, 1, 'semanal');
 
 -- CLIENTES
-INSERT INTO clients (name, industry, contact_name, contact_email, contact_phone, employee_count, created_at) VALUES
-('Acme Corp',              'Manufactura',     'Carlos Méndez',     'carlos.mendez@acme.com.ar',       '+54 11 4321-0001', 120, '2024-08-15'),
-('Beta Solutions',         'Tecnología',       'Laura Fernández',   'laura@betasolutions.com.ar',      '+54 11 4321-0002', 45,  '2024-09-01'),
-('Distribuidora del Sur',  'Logística',        'Martín Rodríguez',  'mrodriguez@delsur.com.ar',        '+54 11 4321-0003', 80,  '2024-10-10'),
-('Estudio Contable Ríos',  'Servicios prof.', 'Ana Ríos',          'arios@estudiorios.com.ar',         '+54 11 4321-0004', 15,  '2024-11-01'),
-('Clínica San Martín',     'Salud',            'Dr. Pablo Herrera', 'pherrera@clinicasanmartin.com.ar', '+54 11 4321-0005', 200, '2024-11-20'),
-('Hotel Palermo',          'Hotelería',        'Sofía López',       'slopez@hotelpalermo.com.ar',      '+54 11 4321-0006', 60,  '2024-12-05'),
-('Constructora Vial',      'Construcción',     'Jorge Domínguez',   'jdominguez@vialsa.com.ar',        '+54 11 4321-0007', 95,  '2025-01-10'),
-('Farmacia Central',       'Salud',            'María Torres',      'mtorres@farmaciacentral.com.ar',  '+54 11 4321-0008', 25,  '2025-01-20');
+INSERT INTO clients (name, industry, contact_name, contact_email, contact_phone, phone, employee_count, created_at) VALUES
+('Acme Corp',              'Manufactura',     'Carlos Méndez',     'carlos.mendez@acme.com.ar',       '+54 11 4321-0001', '541143210001', 120, '2024-08-15'),
+('Beta Solutions',         'Tecnología',       'Laura Fernández',   'laura@betasolutions.com.ar',      '+54 11 4321-0002', '541143210002', 45,  '2024-09-01'),
+('Distribuidora del Sur',  'Logística',        'Martín Rodríguez',  'mrodriguez@delsur.com.ar',        '+54 11 4321-0003', '541143210003', 80,  '2024-10-10'),
+('Estudio Contable Ríos',  'Servicios prof.', 'Ana Ríos',          'arios@estudiorios.com.ar',         '+54 11 4321-0004', '541143210004', 15,  '2024-11-01'),
+('Clínica San Martín',     'Salud',            'Dr. Pablo Herrera', 'pherrera@clinicasanmartin.com.ar', '+54 11 4321-0005', '541143210005', 200, '2024-11-20'),
+('Hotel Palermo',          'Hotelería',        'Sofía López',       'slopez@hotelpalermo.com.ar',      '+54 11 4321-0006', '541143210006', 60,  '2024-12-05'),
+('Constructora Vial',      'Construcción',     'Jorge Domínguez',   'jdominguez@vialsa.com.ar',        '+54 11 4321-0007', '541143210007', 95,  '2025-01-10'),
+('Farmacia Central',       'Salud',            'María Torres',      'mtorres@farmaciacentral.com.ar',  '+54 11 4321-0008', '541143210008', 25,  '2025-01-20'),
+('Demo Facundo',           'Tecnología',       'Facundo',           'facundo@demo.com.ar',             '+54 9 3794 28-5297', '5493794285297', 10, '2025-02-01'),
+('Demo Contacto',          'Consultoría',      'Contacto Test',     'contacto@demo.com.ar',            '+54 9 3794 10-3485', '5493794103485', 5,  '2025-02-01');
 
 -- CONTRATOS
 INSERT INTO contracts (client_id, plan_id, start_date, end_date, status, monthly_amount, notes) VALUES
@@ -27,7 +29,9 @@ INSERT INTO contracts (client_id, plan_id, start_date, end_date, status, monthly
 (5, 3, '2024-12-01', NULL,          'Activo',    999000, 'Incluye servidor dedicado en datacenter'),
 (6, 1, '2024-12-10', '2025-06-10', 'Cancelado', 199000, 'Canceló por reducción de presupuesto'),
 (7, 2, '2025-01-15', NULL,          'Activo',    499000, NULL),
-(8, 1, '2025-02-01', NULL,          'Activo',    199000, 'En período de prueba 30 días');
+(8, 1, '2025-02-01', NULL,          'Activo',    199000, 'En período de prueba 30 días'),
+(9, 2, '2025-02-01', NULL,          'Activo',    499000, 'Demo — Plan Profesional'),
+(10, 1, '2025-02-01', NULL,         'Activo',    199000, 'Demo — Plan Básico');
 
 -- TICKETS DE SOPORTE
 INSERT INTO tickets (client_id, priority, status, category, subject, description, assigned_to, resolution, created_at, updated_at, resolved_at) VALUES
@@ -121,4 +125,15 @@ INSERT INTO tickets (client_id, priority, status, category, subject, description
 (8, 'Media',  'Esperando cliente', 'Software', 'Lentitud en sistema de stock',
     'El sistema de gestión de stock se vuelve muy lento después de las 3 PM.',
     'Técnico: Lucía Morales', NULL,
-    '2025-03-02 16:00:00', '2025-03-03 09:00:00', NULL);
+    '2025-03-02 16:00:00', '2025-03-03 09:00:00', NULL),
+
+-- Demo Facundo (cliente 9) - Plan Profesional
+(9, 'Media',  'Abierto',    'Software',  'Configurar VPN corporativa',
+    'Necesito que configuren acceso VPN para trabajo remoto.',
+    NULL, NULL,
+    '2025-02-10 09:00:00', NULL, NULL),
+
+(9, 'Baja',   'Resuelto',   'Hardware',  'Cambio de disco SSD',
+    'La notebook principal tiene disco lento, pasar a SSD.',
+    'Técnico: Alejandro Vega', 'Se reemplazó HDD por SSD NVMe 512GB y se migró Windows.',
+    '2025-02-05 10:00:00', '2025-02-06 15:00:00', '2025-02-06 15:00:00');

@@ -39,6 +39,7 @@ from api.models import (
     ErrorResponse,
 )
 from rag.query.pipeline import RAGPipeline
+from agent.orchestrator import AgentOrchestrator
 
 # Logging
 logging.basicConfig(
@@ -52,6 +53,7 @@ logger = logging.getLogger(__name__)
 # Singleton del pipeline, inyectable via Depends() para facilitar testing
 
 _pipeline: RAGPipeline | None = None
+_orchestrator: AgentOrchestrator | None = None
 
 
 def get_pipeline(settings: Settings = Depends(get_settings)) -> RAGPipeline:
@@ -68,6 +70,27 @@ def get_pipeline(settings: Settings = Depends(get_settings)) -> RAGPipeline:
     return _pipeline
 
 
+def get_orchestrator(settings: Settings = Depends(get_settings)) -> AgentOrchestrator:
+    """
+    Dependency que provee el AgentOrchestrator.
+
+    Crea el orchestrator con el pipeline RAG inyectado.
+    Permite override en tests via app.dependency_overrides[get_orchestrator].
+    """
+    global _orchestrator
+    if _orchestrator is None:
+        pipeline = get_pipeline(settings)
+        logger.info("Inicializando AgentOrchestrator...")
+        _orchestrator = AgentOrchestrator(
+            db_path=settings.db_full_path,
+            groq_api_key=settings.GROQ_API_KEY,
+            llm_model=settings.LLM_MODEL,
+            rag_pipeline=pipeline,
+        )
+        logger.info("AgentOrchestrator inicializado correctamente")
+    return _orchestrator
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Lifespan event handler: pre-carga el pipeline al startup."""
@@ -75,9 +98,10 @@ async def lifespan(app: FastAPI):
     try:
         settings = get_settings()
         get_pipeline(settings)
-        logger.info("Pipeline pre-cargado")
+        get_orchestrator(settings)
+        logger.info("Pipeline y Orchestrator pre-cargados")
     except Exception as e:
-        logger.error(f"Error inicializando pipeline: {e}")
+        logger.error(f"Error inicializando pipeline/orchestrator: {e}")
 
     yield
     logger.info("KnowLigo API cerrando...")
@@ -328,14 +352,15 @@ async def send_whatsapp_message(to: str, message: str, settings: Settings):
 @app.post("/webhook", tags=["Webhook"])
 async def handle_webhook(
     request: Request,
-    pipeline: RAGPipeline = Depends(get_pipeline),
+    orchestrator: AgentOrchestrator = Depends(get_orchestrator),
     settings: Settings = Depends(get_settings),
 ):
     """
     Recibe mensajes de WhatsApp desde Meta.
 
-    Procesa el mensaje a través del pipeline RAG y envía la respuesta
-    de vuelta al usuario por WhatsApp.
+    Procesa el mensaje a través del AgentOrchestrator que decide:
+    - Si hay un flujo multi-turn activo → continúa el handler
+    - Si no → clasifica intención y despacha (RAG, tickets, contratos, etc.)
     """
     try:
         body = await request.json()
@@ -360,6 +385,11 @@ async def handle_webhook(
                         logger.info(
                             f"Mensaje no-texto ignorado: tipo={message.get('type')}"
                         )
+                        await send_whatsapp_message(
+                            message["from"],
+                            "Disculpe, solo puedo procesar mensajes de texto.",
+                            settings,
+                        )
                         continue
 
                     from_number = message["from"]
@@ -367,25 +397,19 @@ async def handle_webhook(
 
                     logger.info(f"Mensaje de {from_number}: {message_body}")
 
-                    # Procesar a través del pipeline RAG (no bloquea event loop)
+                    # Procesar a través del AgentOrchestrator (no bloquea event loop)
                     try:
-                        result = await asyncio.to_thread(
-                            pipeline.process_query,
-                            user_query=message_body,
-                            user_id=from_number,
+                        response_text = await asyncio.to_thread(
+                            orchestrator.process_message,
+                            raw_phone=from_number,
+                            message=message_body,
                         )
-
-                        if result["success"]:
-                            response_text = result["response"]
-                        else:
-                            response_text = result.get(
-                                "response",
-                                "Disculpa, no pude procesar tu consulta. Por favor, intenta de nuevo.",
-                            )
-
                     except Exception as e:
-                        logger.error(f"Error en RAG pipeline: {e}", exc_info=True)
-                        response_text = "Disculpa, tengo problemas técnicos en este momento. Por favor, intenta nuevamente en unos momentos."
+                        logger.error(f"Error en orchestrator: {e}", exc_info=True)
+                        response_text = (
+                            "Disculpe, tengo problemas técnicos en este momento. "
+                            "Por favor, intente nuevamente en unos momentos."
+                        )
 
                     # Enviar respuesta por WhatsApp
                     await send_whatsapp_message(from_number, response_text, settings)

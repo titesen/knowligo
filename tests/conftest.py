@@ -19,7 +19,7 @@ project_root = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(project_root))
 
 from api.config import Settings, get_settings
-from api.main import app, get_pipeline
+from api.main import app, get_pipeline, get_orchestrator
 
 
 # Settings de prueba
@@ -74,20 +74,40 @@ def mock_pipeline():
     return _make_mock_pipeline()
 
 
+# Mock Orchestrator
+
+
+def _make_mock_orchestrator():
+    """Crea un mock del AgentOrchestrator con respuesta predecible."""
+    mock = MagicMock()
+    mock.process_message.return_value = (
+        "¡Hola! Bienvenido/a a KnowLigo. ¿En qué puedo ayudarle?"
+    )
+    return mock
+
+
+@pytest.fixture
+def mock_orchestrator():
+    """Fixture que provee un mock del orchestrator."""
+    return _make_mock_orchestrator()
+
+
 # TestClient con DI overrides
 
 
 @pytest.fixture
-def client(test_settings, mock_pipeline) -> TestClient:
+def client(test_settings, mock_pipeline, mock_orchestrator) -> TestClient:
     """
     TestClient de FastAPI con dependency overrides.
 
     Reemplaza las dependencias reales por mocks:
     - get_settings → test_settings (sin .env)
     - get_pipeline → mock_pipeline (sin cargar modelos)
+    - get_orchestrator → mock_orchestrator (sin cargar LLM router)
     """
     app.dependency_overrides[get_settings] = lambda: test_settings
     app.dependency_overrides[get_pipeline] = lambda: mock_pipeline
+    app.dependency_overrides[get_orchestrator] = lambda: mock_orchestrator
 
     with TestClient(app, raise_server_exceptions=False) as c:
         yield c

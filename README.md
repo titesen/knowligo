@@ -1,6 +1,6 @@
-# KnowLigo - RAG-Powered IT Support Chatbot
+# KnowLigo - RAG-Powered IT Support Agent
 
-**Proyecto educativo**: Chatbot inteligente de soporte IT para WhatsApp usando RAG (Retrieval-Augmented Generation) con FAISS y Groq LLM.
+**Proyecto educativo**: Agente conversacional de soporte IT para WhatsApp con RAG, flujos multi-turn y gestión transaccional, usando FAISS, Groq LLM y SQLite.
 
 [![Python](https://img.shields.io/badge/Python-3.11+-blue.svg)](https://python.org)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-green.svg)](https://fastapi.tiangolo.com)
@@ -8,10 +8,14 @@
 
 ## 📋 Descripción
 
-KnowLigo es una empresa ficticia de soporte IT para PyMEs. Este proyecto implementa un chatbot conversacional que:
+KnowLigo es una empresa ficticia de soporte IT para PyMEs. Este proyecto implementa un agente conversacional que:
 
-- ✅ Responde consultas sobre **planes de servicio**, **SLAs**, **mantenimiento** y **tickets**
-- ✅ Usa **RAG** (vectorización con FAISS + embeddings) para recuperar información relevante
+- ✅ **Identifica clientes** automáticamente por número de teléfono
+- ✅ **Registra nuevos usuarios** mediante flujo multi-turn (nombre, empresa, email)
+- ✅ Responde consultas sobre **planes de servicio**, **SLAs**, **mantenimiento** y **tickets** usando **RAG**
+- ✅ **Crea tickets de soporte** de manera conversacional (asunto, descripción, prioridad)
+- ✅ **Contrata planes** con selección, confirmación y pago mock
+- ✅ Muestra **estado de cuenta** y **tickets abiertos** del cliente
 - ✅ Genera respuestas naturales con **Groq API** (Llama 3.3 70B)
 - ✅ Integra con **WhatsApp Business API** vía webhook directo en FastAPI
 - ✅ Controla respuestas on-topic, rate limiting y abuse prevention
@@ -24,12 +28,19 @@ Usuario (WhatsApp)
     ↓
 FastAPI /webhook (api/main.py)
     ↓
-RAG Pipeline (rag/query/pipeline.py)
-    ├── Validator (topic control + prompt injection)
-    ├── Intent Classifier
-    ├── Retriever (FAISS + Cross-Encoder reranking)
-    ├── Semantic Cache
-    └── Responder (Groq LLM)
+AgentOrchestrator (agent/orchestrator.py)
+    ├── Identificación por teléfono (DB lookup)
+    ├── Conversation Manager (máquina de estados)
+    ├── LLM Intent Router (Groq) → clasifica intención
+    ├── Handlers multi-turn:
+    │   ├── Registro de usuario
+    │   ├── Crear ticket
+    │   └── Contratar plan + pago mock
+    └── RAG Pipeline → consultas informativas
+         ├── Validator (topic control + prompt injection)
+         ├── Retriever (FAISS + Cross-Encoder reranking)
+         ├── Semantic Cache
+         └── Responder (Groq LLM)
     ↓
 Respuesta → WhatsApp
 ```
@@ -111,6 +122,12 @@ python scripts\validate_demo.py
 
 ```
 knowligo/
+├── agent/                  # Agente conversacional
+│   ├── orchestrator.py    # Orquestador principal (entry point)
+│   ├── router.py          # Clasificación de intención con LLM
+│   ├── handlers.py        # Lógica de flujos multi-turn
+│   ├── conversation.py    # Máquina de estados por teléfono
+│   └── db_service.py      # Capa de acceso a datos
 ├── api/                    # FastAPI application
 │   ├── main.py            # Endpoints REST + webhook WhatsApp
 │   ├── models.py          # Pydantic schemas
@@ -119,12 +136,12 @@ knowligo/
 │   ├── ingest/            # Pipeline de vectorización
 │   │   ├── build_index.py # Crear índice FAISS
 │   │   └── chunker.py     # Procesamiento de documentos
-│   ├── query/             # Pipeline de consultas
-│   │   ├── pipeline.py    # Orquestador principal
+│   ├── query/             # Pipeline de consultas RAG
+│   │   ├── pipeline.py    # Orquestador RAG
 │   │   ├── validator.py   # Control de dominio + prompt injection
 │   │   ├── retriever.py   # Búsqueda vectorial FAISS
 │   │   ├── responder.py   # Generación LLM (Groq)
-│   │   ├── intent.py      # Clasificación de intención
+│   │   ├── intent.py      # Clasificación de intención (keywords)
 │   │   ├── reranker.py    # Cross-Encoder reranking
 │   │   └── cache.py       # Caché semántico
 │   └── store/             # Índices y chunks
@@ -135,14 +152,18 @@ knowligo/
 │   ├── documents/         # Documentos markdown
 │   └── metadata.json      # Topics permitidos/prohibidos
 ├── database/
-│   ├── schema/            # Schema SQL
+│   ├── schema/            # Schema SQL (plans, clients, contracts,
+│   │                      #   tickets, conversations, payments)
 │   ├── seeds/             # Datos de prueba
 │   └── sqlite/            # Base de datos
-├── tests/                 # Tests con pytest
-│   ├── test_health.py
-│   ├── test_query.py
-│   ├── test_webhook.py
-│   └── test_errors.py
+├── tests/                 # Tests con pytest (79 tests)
+│   ├── test_api.py        # Tests de endpoints FastAPI
+│   ├── test_orchestrator.py # Tests del agente (flujos completos)
+│   ├── test_db_service.py # Tests de capa de datos
+│   ├── test_conversation.py # Tests de máquina de estados
+│   ├── test_intent.py     # Tests de clasificación
+│   ├── test_models.py     # Tests de schemas Pydantic
+│   └── test_validator.py  # Tests de validación
 ├── scripts/
 │   ├── test_api.py        # Tests funcionales manuales
 │   ├── validate_demo.py   # Validación pre-demo
@@ -189,14 +210,15 @@ curl -X POST http://localhost:8000/query `
 ### Tests unitarios con pytest
 
 ```powershell
-# Ejecutar todos los tests
+# Ejecutar todos los tests (79 tests)
 python -m pytest tests/ -v
 
 # Tests específicos
-python -m pytest tests/test_health.py -v
-python -m pytest tests/test_query.py -v
-python -m pytest tests/test_webhook.py -v
-python -m pytest tests/test_errors.py -v
+python -m pytest tests/test_api.py -v
+python -m pytest tests/test_orchestrator.py -v
+python -m pytest tests/test_db_service.py -v
+python -m pytest tests/test_conversation.py -v
+python -m pytest tests/test_validator.py -v
 ```
 
 ### Test funcional del pipeline
@@ -207,8 +229,9 @@ python scripts\test_api.py
 ```
 
 Prueba queries de ejemplo:
-- "¿Qué planes de soporte ofrecen?" → Intent: planes
-- "¿Cuál es el SLA para tickets High?" → Intent: sla
+- "¿Qué planes de soporte ofrecen?" → Intent: VER_PLANES
+- "¿Cuál es el SLA para tickets High?" → Intent: CONSULTA_RAG
+- "Quiero crear un ticket" → Flujo multi-turn de creación
 - "Dame consejos de hacking" → Rechazado (fuera de dominio)
 
 ## 📊 Endpoints de la API
@@ -287,9 +310,14 @@ LLM_MODEL=llama-3.3-70b-versatile
 - [x] Validación de dominio y rate limiting
 - [x] Webhook WhatsApp directo en FastAPI
 - [x] Docker compose
-- [x] Tests unitarios con pytest (38 tests)
 - [x] Embeddings multilingüe + Cross-Encoder reranking
 - [x] Caché semántico + Protección contra prompt injection
+- [x] **Agente conversacional con flujos multi-turn**
+- [x] **Identificación de clientes por teléfono**
+- [x] **Registro de usuarios, creación de tickets, contratación de planes**
+- [x] **Pagos mock y sistema de contratos**
+- [x] **LLM Router para clasificación de intenciones**
+- [x] Tests unitarios con pytest (79 tests)
 - [ ] Monitoreo con Prometheus/Grafana
 - [ ] Frontend web para administración
 - [ ] Soporte para múltiples idiomas

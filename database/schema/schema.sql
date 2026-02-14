@@ -23,9 +23,12 @@ CREATE TABLE clients (
     contact_name TEXT NOT NULL,
     contact_email TEXT NOT NULL,
     contact_phone TEXT,
+    phone TEXT UNIQUE,                  -- WhatsApp E.164 sin '+' (ej: 5493794285297)
     employee_count INTEGER,
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
+
+CREATE INDEX idx_clients_phone ON clients(phone);
 
 -- CONTRATOS
 CREATE TABLE contracts (
@@ -80,3 +83,30 @@ CREATE TABLE IF NOT EXISTS query_logs (
 );
 
 CREATE INDEX IF NOT EXISTS idx_user_timestamp ON query_logs(user_id, timestamp);
+
+-- CONVERSACIONES (estado del agente por teléfono)
+CREATE TABLE conversations (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    phone TEXT NOT NULL UNIQUE,
+    state TEXT NOT NULL DEFAULT 'IDLE',
+    context TEXT NOT NULL DEFAULT '{}', -- JSON blob
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE INDEX idx_conversations_phone ON conversations(phone);
+
+-- PAGOS (mock de pasarela)
+CREATE TABLE payments (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    contract_id INTEGER NOT NULL,
+    amount REAL NOT NULL,
+    status TEXT NOT NULL DEFAULT 'Pendiente'
+        CHECK(status IN ('Pendiente', 'Aprobado', 'Rechazado')),
+    payment_method TEXT NOT NULL DEFAULT 'Transferencia',
+    reference_code TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    FOREIGN KEY (contract_id) REFERENCES contracts(id)
+);
+
+CREATE INDEX idx_payments_contract ON payments(contract_id);
