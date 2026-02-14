@@ -8,16 +8,16 @@ Este módulo:
 4. Maneja errores de API
 """
 
-import os
+import logging
 from typing import List, Dict, Optional
-from pathlib import Path
 
 try:
     from groq import Groq
-    from dotenv import load_dotenv
 except ImportError:
-    print("⚠️  Dependencias no instaladas. Ejecuta: pip install groq python-dotenv")
+    print("⚠️  Dependencias no instaladas. Ejecuta: pip install groq")
     exit(1)
+
+logger = logging.getLogger(__name__)
 
 
 class GroqResponder:
@@ -28,21 +28,10 @@ class GroqResponder:
         Inicializa el responder con Groq client.
 
         Args:
-            api_key: API key de Groq (si None, lee de .env)
-            model: Modelo a usar (default: mixtral-8x7b-32768)
-            max_words: Máximo de palabras en respuesta (default: 120)
+            api_key: API key de Groq (requerida)
+            model: Modelo a usar (default: llama-3.3-70b-versatile)
+            max_words: Máximo de palabras en respuesta (default: 150)
         """
-        # Cargar variables de entorno
-        project_root = Path(__file__).resolve().parent.parent.parent
-        env_path = project_root / ".env"
-
-        if env_path.exists():
-            load_dotenv(env_path)
-
-        # Configurar API key
-        if api_key is None:
-            api_key = os.getenv("GROQ_API_KEY")
-
         if not api_key:
             raise ValueError(
                 "GROQ_API_KEY no encontrada. "
@@ -52,12 +41,12 @@ class GroqResponder:
         self.client = Groq(api_key=api_key)
 
         # Configurar modelo
-        self.model = model or os.getenv("LLM_MODEL", "llama-3.3-70b-versatile")
+        self.model = model or "llama-3.3-70b-versatile"
 
         # Configurar límite de palabras
-        self.max_words = max_words or int(os.getenv("MAX_MESSAGE_LENGTH", "120"))
+        self.max_words = max_words or 150
 
-        print(f"✅ Groq Responder inicializado (modelo: {self.model})")
+        logger.info(f"Groq Responder inicializado (modelo: {self.model})")
 
     def generate_response(
         self,

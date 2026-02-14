@@ -1,6 +1,4 @@
--- =============================================
 -- PLANES (precios en ARS mensuales)
--- =============================================
 INSERT INTO plans (name, description, price_ars, max_tickets_month, support_hours, includes_onsite, includes_backup, includes_drp, maintenance_frequency) VALUES
 ('Básico',       'Soporte remoto en horario laboral. Ideal para PyMEs con necesidades básicas de IT.',
     199000, 15, 'Lun-Vie 08:00-18:00', 0, 0, 0, 'trimestral'),
@@ -9,9 +7,7 @@ INSERT INTO plans (name, description, price_ars, max_tickets_month, support_hour
 ('Empresarial',  'Soporte integral 24/7 con técnico dedicado, backup diario y DRP. Para empresas con operación crítica.',
     999000, NULL, '24/7 los 365 días', 1, 1, 1, 'semanal');
 
--- =============================================
 -- CLIENTES
--- =============================================
 INSERT INTO clients (name, industry, contact_name, contact_email, contact_phone, employee_count, created_at) VALUES
 ('Acme Corp',              'Manufactura',     'Carlos Méndez',     'carlos.mendez@acme.com.ar',       '+54 11 4321-0001', 120, '2024-08-15'),
 ('Beta Solutions',         'Tecnología',       'Laura Fernández',   'laura@betasolutions.com.ar',      '+54 11 4321-0002', 45,  '2024-09-01'),
@@ -22,9 +18,7 @@ INSERT INTO clients (name, industry, contact_name, contact_email, contact_phone,
 ('Constructora Vial',      'Construcción',     'Jorge Domínguez',   'jdominguez@vialsa.com.ar',        '+54 11 4321-0007', 95,  '2025-01-10'),
 ('Farmacia Central',       'Salud',            'María Torres',      'mtorres@farmaciacentral.com.ar',  '+54 11 4321-0008', 25,  '2025-01-20');
 
--- =============================================
 -- CONTRATOS
--- =============================================
 INSERT INTO contracts (client_id, plan_id, start_date, end_date, status, monthly_amount, notes) VALUES
 (1, 2, '2024-09-01', NULL,          'Activo',    499000, 'Upgrade desde Básico en Nov 2024'),
 (2, 1, '2024-09-15', NULL,          'Activo',    199000, NULL),
@@ -35,9 +29,7 @@ INSERT INTO contracts (client_id, plan_id, start_date, end_date, status, monthly
 (7, 2, '2025-01-15', NULL,          'Activo',    499000, NULL),
 (8, 1, '2025-02-01', NULL,          'Activo',    199000, 'En período de prueba 30 días');
 
--- =============================================
 -- TICKETS DE SOPORTE
--- =============================================
 INSERT INTO tickets (client_id, priority, status, category, subject, description, assigned_to, resolution, created_at, updated_at, resolved_at) VALUES
 -- Acme Corp (cliente 1) - Plan Profesional
 (1, 'Alta',   'Resuelto',   'Red',       'Servidor de archivos no responde',

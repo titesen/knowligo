@@ -1,68 +1,90 @@
 """
 FastAPI Application - API REST para KnowLigo RAG Chatbot
+- Settings centralizado (Pydantic BaseSettings via config.py)
+- Dependency Injection con Depends()
+- HTTP Status Codes correctos + Error Handler global
+- Async con asyncio.to_thread para operaciones bloqueantes
 
-Expone endpoints para:
-- Procesar queries del chatbot
-- Webhook de WhatsApp (verificación + mensajes)
-- Health checks
-- Métricas básicas
+Endpoints:
+- GET  /          → Raíz informativa
+- GET  /health    → Health check
+- GET  /webhook   → Verificación de WhatsApp
+- POST /webhook   → Mensajes entrantes de WhatsApp
+- POST /query     → Procesar query RAG
+- GET  /stats     → Estadísticas del sistema
 """
 
-import os
+import asyncio
 import sys
 import httpx
+import sqlite3
+import logging
 from pathlib import Path
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, HTTPException, status, Request
+from fastapi import FastAPI, Depends, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, PlainTextResponse
-import logging
+from fastapi.exceptions import RequestValidationError
 
 # Agregar directorio raíz al path para imports
 project_root = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(project_root))
 
-from api.models import QueryRequest, QueryResponse, HealthResponse, SourceInfo
+from api.config import Settings, get_settings
+from api.models import (
+    QueryRequest,
+    QueryResponse,
+    HealthResponse,
+    SourceInfo,
+    ErrorResponse,
+)
 from rag.query.pipeline import RAGPipeline
 
-# Configurar logging
+# Logging
 logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
 )
 logger = logging.getLogger(__name__)
 
-# Inicializar pipeline (lazy loading)
-_pipeline = None
+
+# Dependency Injection
+# Singleton del pipeline, inyectable via Depends() para facilitar testing
+
+_pipeline: RAGPipeline | None = None
 
 
-def get_pipeline() -> RAGPipeline:
-    """Obtiene o inicializa el pipeline RAG"""
+def get_pipeline(settings: Settings = Depends(get_settings)) -> RAGPipeline:
+    """
+    Dependency que provee el pipeline RAG.
+
+    Permite override en tests via app.dependency_overrides[get_pipeline].
+    """
     global _pipeline
     if _pipeline is None:
         logger.info("Inicializando RAG Pipeline...")
-        _pipeline = RAGPipeline()
+        _pipeline = RAGPipeline(settings=settings)
         logger.info("Pipeline inicializado correctamente")
     return _pipeline
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Lifespan event handler"""
-    # Startup
-    logger.info("🚀 KnowLigo API iniciando...")
+    """Lifespan event handler: pre-carga el pipeline al startup."""
+    logger.info("KnowLigo API iniciando...")
     try:
-        get_pipeline()
-        logger.info("✅ Pipeline pre-cargado")
+        settings = get_settings()
+        get_pipeline(settings)
+        logger.info("Pipeline pre-cargado")
     except Exception as e:
-        logger.error(f"❌ Error inicializando pipeline: {e}")
+        logger.error(f"Error inicializando pipeline: {e}")
 
     yield
-
-    # Shutdown
-    logger.info("👋 KnowLigo API cerrando...")
+    logger.info("KnowLigo API cerrando...")
 
 
-# Crear app
+# FastAPI App
+
 app = FastAPI(
     title="KnowLigo RAG API",
     description="API REST para chatbot de soporte IT con RAG",
@@ -70,6 +92,10 @@ app = FastAPI(
     docs_url="/docs",
     redoc_url="/redoc",
     lifespan=lifespan,
+    responses={
+        422: {"model": ErrorResponse, "description": "Error de validación"},
+        500: {"model": ErrorResponse, "description": "Error interno"},
+    },
 )
 
 # CORS middleware (para desarrollo)
@@ -80,6 +106,60 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+# Global Error Handlers
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    """Errores de validación Pydantic → 422 con formato ErrorResponse."""
+    return JSONResponse(
+        status_code=422,
+        content=ErrorResponse(
+            type="validation_error",
+            title="Datos de entrada inválidos",
+            status=422,
+            detail=str(exc.errors()),
+        ).model_dump(),
+    )
+
+
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request: Request, exc: HTTPException):
+    """HTTPException → ErrorResponse con el status original."""
+    return JSONResponse(
+        status_code=exc.status_code,
+        content=ErrorResponse(
+            type="http_error",
+            title=exc.detail if isinstance(exc.detail, str) else "Error",
+            status=exc.status_code,
+            detail=exc.detail if isinstance(exc.detail, str) else str(exc.detail),
+        ).model_dump(),
+    )
+
+
+@app.exception_handler(Exception)
+async def generic_exception_handler(request: Request, exc: Exception):
+    """
+    Excepción no manejada → 500 genérico.
+
+    Loguea el error real pero devuelve mensaje genérico al cliente
+    para no filtrar detalles internos (Best Practices §4.2).
+    """
+    logger.error(f"Error no manejado en {request.url.path}: {exc}", exc_info=True)
+    return JSONResponse(
+        status_code=500,
+        content=ErrorResponse(
+            type="internal_error",
+            title="Error Interno",
+            status=500,
+            detail="Error interno del servidor. Intenta nuevamente más tarde.",
+        ).model_dump(),
+    )
+
+
+# Endpoints
 
 
 @app.get("/", tags=["Root"])
@@ -94,7 +174,7 @@ async def root():
 
 
 @app.get("/health", response_model=HealthResponse, tags=["Health"])
-async def health_check():
+async def health_check(pipeline: RAGPipeline = Depends(get_pipeline)):
     """
     Health check endpoint.
 
@@ -106,54 +186,49 @@ async def health_check():
     components = {}
     overall_status = "healthy"
 
+    # Check database
     try:
-        pipeline = get_pipeline()
-
-        # Check database
-        try:
-            if pipeline.db_path.exists():
-                components["database"] = "ok"
-            else:
-                components["database"] = "missing"
-                overall_status = "degraded"
-        except Exception as e:
-            components["database"] = f"error: {str(e)}"
+        if pipeline.db_path.exists():
+            components["database"] = "ok"
+        else:
+            components["database"] = "missing"
             overall_status = "degraded"
+    except Exception:
+        components["database"] = "error"
+        overall_status = "degraded"
 
-        # Check FAISS index
-        try:
-            if pipeline.retriever.index.ntotal > 0:
-                components["faiss_index"] = (
-                    f"ok ({pipeline.retriever.index.ntotal} vectors)"
-                )
-            else:
-                components["faiss_index"] = "empty"
-                overall_status = "degraded"
-        except Exception as e:
-            components["faiss_index"] = f"error: {str(e)}"
-            overall_status = "unhealthy"
-
-        # Check Groq API (verificar que existe API key)
-        try:
-            if pipeline.responder.client.api_key:
-                components["groq_api"] = "ok"
-            else:
-                components["groq_api"] = "no_api_key"
-                overall_status = "degraded"
-        except Exception as e:
-            components["groq_api"] = f"error: {str(e)}"
+    # Check FAISS index
+    try:
+        if pipeline.retriever.index.ntotal > 0:
+            components["faiss_index"] = (
+                f"ok ({pipeline.retriever.index.ntotal} vectors)"
+            )
+        else:
+            components["faiss_index"] = "empty"
             overall_status = "degraded"
-
-    except Exception as e:
-        logger.error(f"Error en health check: {e}")
+    except Exception:
+        components["faiss_index"] = "error"
         overall_status = "unhealthy"
-        components["pipeline"] = f"error: {str(e)}"
+
+    # Check Groq API
+    try:
+        if pipeline.responder.client.api_key:
+            components["groq_api"] = "ok"
+        else:
+            components["groq_api"] = "no_api_key"
+            overall_status = "degraded"
+    except Exception:
+        components["groq_api"] = "error"
+        overall_status = "degraded"
 
     return HealthResponse(status=overall_status, version="1.0.0", components=components)
 
 
 @app.get("/webhook", tags=["Webhook"])
-async def verify_webhook(request: Request):
+async def verify_webhook(
+    request: Request,
+    settings: Settings = Depends(get_settings),
+):
     """
     Verificación del webhook de WhatsApp (Meta).
 
@@ -168,7 +243,7 @@ async def verify_webhook(request: Request):
     token = request.query_params.get("hub.verify_token")
     challenge = request.query_params.get("hub.challenge")
 
-    verify_token = os.getenv("WHATSAPP_VERIFY_TOKEN", "knowligo_webhook_2026")
+    verify_token = settings.WHATSAPP_VERIFY_TOKEN
 
     logger.info(
         f"🔐 Webhook verification request: mode={mode}, token={'***' if token else 'None'}, challenge={challenge}"
@@ -186,12 +261,12 @@ async def verify_webhook(request: Request):
         raise HTTPException(status_code=403, detail="Verification failed")
 
 
-async def send_whatsapp_message(to: str, message: str):
+async def send_whatsapp_message(to: str, message: str, settings: Settings):
     """
     Envía un mensaje de WhatsApp usando la Cloud API de Meta.
     """
-    phone_number_id = os.getenv("WHATSAPP_PHONE_NUMBER_ID")
-    whatsapp_token = os.getenv("WHATSAPP_TOKEN")
+    phone_number_id = settings.WHATSAPP_PHONE_NUMBER_ID
+    whatsapp_token = settings.WHATSAPP_TOKEN
 
     if not phone_number_id or not whatsapp_token:
         logger.error(
@@ -251,7 +326,11 @@ async def send_whatsapp_message(to: str, message: str):
 
 
 @app.post("/webhook", tags=["Webhook"])
-async def handle_webhook(request: Request):
+async def handle_webhook(
+    request: Request,
+    pipeline: RAGPipeline = Depends(get_pipeline),
+    settings: Settings = Depends(get_settings),
+):
     """
     Recibe mensajes de WhatsApp desde Meta.
 
@@ -260,11 +339,11 @@ async def handle_webhook(request: Request):
     """
     try:
         body = await request.json()
-        logger.info(f"📩 Webhook POST recibido")
+        logger.info("Webhook POST recibido")
 
         # Validar que sea un evento de WhatsApp Business
         if body.get("object") != "whatsapp_business_account":
-            logger.info("⏭️ Evento ignorado (no es whatsapp_business_account)")
+            logger.info("Evento ignorado (no es whatsapp_business_account)")
             return {"status": "ignored"}
 
         for entry in body.get("entry", []):
@@ -279,20 +358,19 @@ async def handle_webhook(request: Request):
                     # Solo procesar mensajes de texto
                     if message.get("type") != "text":
                         logger.info(
-                            f"⏭️ Mensaje no-texto ignorado: tipo={message.get('type')}"
+                            f"Mensaje no-texto ignorado: tipo={message.get('type')}"
                         )
                         continue
 
                     from_number = message["from"]
                     message_body = message.get("text", {}).get("body", "")
-                    message_id = message.get("id", "")
 
-                    logger.info(f"📱 Mensaje de {from_number}: {message_body}")
+                    logger.info(f"Mensaje de {from_number}: {message_body}")
 
-                    # Procesar a través del pipeline RAG
+                    # Procesar a través del pipeline RAG (no bloquea event loop)
                     try:
-                        pipeline = get_pipeline()
-                        result = pipeline.process_query(
+                        result = await asyncio.to_thread(
+                            pipeline.process_query,
                             user_query=message_body,
                             user_id=from_number,
                         )
@@ -306,21 +384,43 @@ async def handle_webhook(request: Request):
                             )
 
                     except Exception as e:
-                        logger.error(f"❌ Error en RAG pipeline: {e}", exc_info=True)
+                        logger.error(f"Error en RAG pipeline: {e}", exc_info=True)
                         response_text = "Disculpa, tengo problemas técnicos en este momento. Por favor, intenta nuevamente en unos momentos."
 
                     # Enviar respuesta por WhatsApp
-                    await send_whatsapp_message(from_number, response_text)
+                    await send_whatsapp_message(from_number, response_text, settings)
 
         return {"status": "ok"}
 
     except Exception as e:
         logger.error(f"Error procesando webhook: {e}", exc_info=True)
-        return {"status": "error", "message": str(e)}
+        return JSONResponse(
+            status_code=500,
+            content=ErrorResponse(
+                type="webhook_error",
+                title="Error procesando webhook",
+                status=500,
+                detail="Error interno procesando el mensaje.",
+            ).model_dump(),
+        )
 
 
-@app.post("/query", response_model=QueryResponse, tags=["Query"])
-async def process_query(request: QueryRequest):
+@app.post(
+    "/query",
+    response_model=QueryResponse,
+    responses={
+        400: {
+            "model": ErrorResponse,
+            "description": "Query inválida o fuera de dominio",
+        },
+        429: {"model": ErrorResponse, "description": "Rate limit excedido"},
+    },
+    tags=["Query"],
+)
+async def process_query(
+    request: QueryRequest,
+    pipeline: RAGPipeline = Depends(get_pipeline),
+):
     """
     Procesa una query del usuario a través del pipeline RAG.
 
@@ -332,99 +432,91 @@ async def process_query(request: QueryRequest):
     5. Generación de respuesta (Groq LLM)
     6. Logging
 
-    **Rate Limiting:**
-    - Máximo 10 queries por usuario por hora (configurable)
-
     **Errores posibles:**
     - 400: Query inválida o fuera de dominio
     - 429: Rate limit excedido
     - 500: Error interno del pipeline
     """
-    try:
-        logger.info(
-            f"Query recibida de user {request.user_id}: {request.message[:50]}..."
+    logger.info(f"Query recibida de user {request.user_id}: {request.message[:50]}...")
+
+    # Procesar query (no bloquea el event loop)
+    result = await asyncio.to_thread(
+        pipeline.process_query,
+        user_query=request.message,
+        user_id=request.user_id,
+        conversation_history=request.conversation_history,
+    )
+
+    # Success
+    if result["success"]:
+        logger.info(f"Query procesada exitosamente para {request.user_id}")
+
+        # Convertir sources a SourceInfo objects
+        sources = None
+        if "sources" in result and result["sources"]:
+            sources = [
+                SourceInfo(
+                    file=src["file"],
+                    section=src.get("section", ""),
+                    score=src["score"],
+                )
+                for src in result["sources"]
+            ]
+
+        return QueryResponse(
+            success=True,
+            response=result["response"],
+            intent=result["intent"],
+            intent_confidence=result.get("intent_confidence"),
+            sources=sources,
+            tokens_used=result.get("tokens_used"),
+            processing_time=result.get("processing_time"),
+            error=None,
         )
 
-        # Obtener pipeline
-        pipeline = get_pipeline()
+    # Rate Limit → 429
+    error_type = result.get("error", "unknown")
 
-        # Procesar query
-        result = pipeline.process_query(
-            user_query=request.message,
-            user_id=request.user_id,
-            conversation_history=request.conversation_history,
+    if error_type == "rate_limit_exceeded":
+        logger.warning(f"Rate limit excedido para {request.user_id}")
+        return JSONResponse(
+            status_code=429,
+            content=ErrorResponse(
+                type="rate_limit",
+                title="Rate Limit Exceeded",
+                status=429,
+                detail=result["response"],
+            ).model_dump(),
         )
 
-        # Mapear resultado a response model
-        if result["success"]:
-            logger.info(f"Query procesada exitosamente para {request.user_id}")
-
-            # Convertir sources a SourceInfo objects
-            sources = None
-            if "sources" in result and result["sources"]:
-                sources = [
-                    SourceInfo(
-                        file=src["file"],
-                        section=src.get("section", ""),
-                        score=src["score"],
-                    )
-                    for src in result["sources"]
-                ]
-
-            return QueryResponse(
-                success=True,
-                response=result["response"],
-                intent=result["intent"],
-                intent_confidence=result.get("intent_confidence"),
-                sources=sources,
-                tokens_used=result.get("tokens_used"),
-                processing_time=result.get("processing_time"),
-                error=None,
-            )
-        else:
-            # Error en el procesamiento
-            error_type = result.get("error", "unknown")
-
-            # Rate limit
-            if error_type == "rate_limit_exceeded":
-                logger.warning(f"Rate limit excedido para {request.user_id}")
-                return QueryResponse(
-                    success=False,
-                    response=result["response"],
-                    intent=result["intent"],
-                    error=error_type,
-                )
-
-            # Query inválida
-            elif error_type == "invalid_query":
-                logger.info(f"Query inválida de {request.user_id}")
-                return QueryResponse(
-                    success=False,
-                    response=result["response"],
-                    intent=result["intent"],
-                    error=error_type,
-                )
-
-            # Otro error
-            else:
-                logger.error(f"Error procesando query: {error_type}")
-                return QueryResponse(
-                    success=False,
-                    response=result["response"],
-                    intent=result.get("intent", "error"),
-                    error=error_type,
-                )
-
-    except Exception as e:
-        logger.error(f"Error inesperado en /query: {e}", exc_info=True)
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error interno del servidor: {str(e)}",
+    # Query Inválida → 400
+    if error_type == "invalid_query":
+        logger.info(f"Query inválida de {request.user_id}")
+        return JSONResponse(
+            status_code=400,
+            content=ErrorResponse(
+                type="invalid_query",
+                title="Query Inválida",
+                status=400,
+                detail=result["response"],
+            ).model_dump(),
         )
+
+    # Otro error del pipeline → 500
+    logger.error(f"Error procesando query: {error_type}")
+    return JSONResponse(
+        status_code=500,
+        content=ErrorResponse(
+            type="pipeline_error",
+            title="Error de Procesamiento",
+            status=500,
+            detail="Error procesando la consulta. Intenta nuevamente.",
+        ).model_dump(),
+    )
 
 
 @app.get("/stats", tags=["Stats"])
-async def get_stats():
+async def get_stats(pipeline: RAGPipeline = Depends(get_pipeline)):
     """
     Obtiene estadísticas básicas del sistema.
 
@@ -433,23 +525,18 @@ async def get_stats():
     - Queries por intent
     - Rate de éxito
     """
-    try:
-        import sqlite3
 
-        pipeline = get_pipeline()
-
-        conn = sqlite3.connect(pipeline.db_path)
+    def _fetch_stats(db_path):
+        """Operación bloqueante de SQLite, ejecutada en thread."""
+        conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
 
-        # Total queries
         cursor.execute("SELECT COUNT(*) FROM query_logs")
         total_queries = cursor.fetchone()[0]
 
-        # Queries exitosas
         cursor.execute("SELECT COUNT(*) FROM query_logs WHERE success = 1")
         successful_queries = cursor.fetchone()[0]
 
-        # Queries por intent
         cursor.execute("""
             SELECT intent, COUNT(*) as count 
             FROM query_logs 
@@ -458,7 +545,6 @@ async def get_stats():
         """)
         intent_stats = {row[0]: row[1] for row in cursor.fetchall()}
 
-        # Usuarios únicos
         cursor.execute("SELECT COUNT(DISTINCT user_id) FROM query_logs")
         unique_users = cursor.fetchone()[0]
 
@@ -476,23 +562,34 @@ async def get_stats():
             "intent_distribution": intent_stats,
         }
 
-    except Exception as e:
-        logger.error(f"Error obteniendo stats: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error obteniendo estadísticas: {str(e)}",
-        )
+    return await asyncio.to_thread(_fetch_stats, pipeline.db_path)
 
 
-# Error handlers
+# Error Handler 404
+
+
 @app.exception_handler(404)
-async def not_found_handler(request, exc):
+async def not_found_handler(request: Request, exc):
     """Handler para 404"""
-    return JSONResponse(status_code=404, content={"detail": "Endpoint no encontrado"})
+    return JSONResponse(
+        status_code=404,
+        content=ErrorResponse(
+            type="not_found",
+            title="No Encontrado",
+            status=404,
+            detail=f"El endpoint '{request.url.path}' no existe.",
+        ).model_dump(),
+    )
 
 
 if __name__ == "__main__":
     import uvicorn
 
-    # Configuración para desarrollo
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True, log_level="info")
+    settings = get_settings()
+    uvicorn.run(
+        "main:app",
+        host=settings.API_HOST,
+        port=settings.API_PORT,
+        reload=True,
+        log_level="info",
+    )

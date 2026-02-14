@@ -14,11 +14,11 @@ from pathlib import Path
 from typing import Tuple
 
 
-# ============================================================================
-# Patrones de Prompt Injection
-# Detecta intentos de manipular el sistema vía instrucciones maliciosas.
-# Incluye patrones en español e inglés para cobertura completa.
-# ============================================================================
+"""
+- Patrones de Prompt Injection
+- Detecta intentos de manipular el sistema vía instrucciones maliciosas.
+- Incluye patrones en español e inglés para cobertura completa.
+"""
 INJECTION_PATTERNS = [
     # Intentos de override de instrucciones
     r"ignor[ae]\s+(todas?\s+las?\s+)?instrucciones",

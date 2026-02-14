@@ -1,8 +1,6 @@
 PRAGMA foreign_keys = ON;
 
--- =============================================
 -- PLANES DE SERVICIO
--- =============================================
 CREATE TABLE plans (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL UNIQUE,
@@ -17,9 +15,7 @@ CREATE TABLE plans (
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
--- =============================================
 -- CLIENTES
--- =============================================
 CREATE TABLE clients (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,
@@ -31,9 +27,7 @@ CREATE TABLE clients (
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
--- =============================================
 -- CONTRATOS
--- =============================================
 CREATE TABLE contracts (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     client_id INTEGER NOT NULL,
@@ -50,9 +44,7 @@ CREATE TABLE contracts (
 CREATE INDEX idx_contracts_client ON contracts(client_id);
 CREATE INDEX idx_contracts_status ON contracts(status);
 
--- =============================================
 -- TICKETS DE SOPORTE
--- =============================================
 CREATE TABLE tickets (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     client_id INTEGER NOT NULL,
@@ -73,9 +65,7 @@ CREATE INDEX idx_tickets_client ON tickets(client_id);
 CREATE INDEX idx_tickets_status ON tickets(status);
 CREATE INDEX idx_tickets_priority ON tickets(priority);
 
--- =============================================
 -- LOGS DE QUERIES DEL CHATBOT
--- =============================================
 CREATE TABLE IF NOT EXISTS query_logs (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id TEXT NOT NULL,

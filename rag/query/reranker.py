@@ -10,20 +10,12 @@ El Cross-Encoder analiza la relación directa entre query y cada chunk,
 ofreciendo mayor precisión que la búsqueda vectorial por similitud coseno.
 """
 
-import os
-from pathlib import Path
+import logging
 from typing import List, Dict
-from dotenv import load_dotenv
 
-# Cargar .env
-_script_dir = Path(__file__).resolve().parent
-_project_root = _script_dir.parent.parent
-_env_path = _project_root / ".env"
-if _env_path.exists():
-    load_dotenv(_env_path)
+logger = logging.getLogger(__name__)
 
-
-# Modelo cross-encoder multilingüe por defecto
+# Modelo cross-encoder por defecto
 DEFAULT_RERANK_MODEL = "cross-encoder/ms-marco-MiniLM-L-6-v2"
 
 
@@ -35,7 +27,7 @@ class CrossEncoderReranker:
         Inicializa el Cross-Encoder reranker.
 
         Args:
-            model_name: Modelo de cross-encoder (lee de RERANK_MODEL env var)
+            model_name: Modelo de cross-encoder
             top_n: Cantidad de chunks a retornar después del reranking
         """
         try:
@@ -46,20 +38,20 @@ class CrossEncoderReranker:
                 "Ejecuta: pip install sentence-transformers"
             )
 
-        # Modelo: parámetro > env > default
+        # Modelo: parámetro > default
         if model_name is None:
-            model_name = os.getenv("RERANK_MODEL", DEFAULT_RERANK_MODEL)
+            model_name = DEFAULT_RERANK_MODEL
 
-        # Top-N: parámetro > env > default 5
+        # Top-N: parámetro > default 5
         if top_n is None:
-            top_n = int(os.getenv("RERANK_TOP_N", "5"))
+            top_n = 5
 
         self.top_n = top_n
         self.model_name = model_name
 
-        print(f"📥 Cargando Cross-Encoder: {model_name}")
+        logger.info(f"Cargando Cross-Encoder: {model_name}")
         self.model = CrossEncoder(model_name)
-        print(f"✅ Cross-Encoder cargado (top_n={self.top_n})")
+        logger.info(f"Cross-Encoder cargado (top_n={self.top_n})")
 
     def rerank(self, query: str, chunks: List[Dict], top_n: int = None) -> List[Dict]:
         """

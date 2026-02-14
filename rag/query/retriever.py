@@ -8,13 +8,12 @@ Este módulo:
 4. Retorna contexto relevante para el LLM
 """
 
-import os
 import json
+import logging
 import pickle
 from pathlib import Path
 from typing import List, Dict, Tuple
 import numpy as np
-from dotenv import load_dotenv
 
 try:
     from sentence_transformers import SentenceTransformer
@@ -26,6 +25,8 @@ except ImportError:
 
 # Modelo multilingüe por defecto (soporta español, inglés, y 50+ idiomas)
 DEFAULT_EMBEDDING_MODEL = "paraphrase-multilingual-MiniLM-L12-v2"
+
+logger = logging.getLogger(__name__)
 
 
 class FAISSRetriever:
@@ -43,20 +44,16 @@ class FAISSRetriever:
         Args:
             index_path: Ruta al archivo .index de FAISS
             metadata_path: Ruta al JSON con metadata de chunks
-            model_name: Modelo de sentence-transformers para embeddings (lee de EMBEDDING_MODEL env var)
+            model_name: Modelo de sentence-transformers (default: multilingüe)
         """
-        # Cargar .env
-        script_dir = Path(__file__).resolve().parent
-        project_root = script_dir.parent.parent
-        env_path = project_root / ".env"
-        if env_path.exists():
-            load_dotenv(env_path)
-
-        # Modelo de embeddings: parámetro > env > default multilingüe
+        # Modelo de embeddings: parámetro > default
         if model_name is None:
-            model_name = os.getenv("EMBEDDING_MODEL", DEFAULT_EMBEDDING_MODEL)
+            model_name = DEFAULT_EMBEDDING_MODEL
 
         # Rutas por defecto
+        script_dir = Path(__file__).resolve().parent
+        project_root = script_dir.parent.parent
+
         if index_path is None or metadata_path is None:
             store_dir = project_root / "rag" / "store"
 
@@ -69,7 +66,7 @@ class FAISSRetriever:
         self.metadata_path = Path(metadata_path)
 
         # Cargar modelo de embeddings
-        print(f"📥 Cargando modelo de embeddings: {model_name}")
+        logger.info(f"Cargando modelo de embeddings: {model_name}")
         self.model = SentenceTransformer(model_name)
         self.model_name = model_name
 

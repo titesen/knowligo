@@ -11,12 +11,10 @@ Si una query nueva es semánticamente similar (>= threshold) a una
 query cacheada, retorna la respuesta cacheada sin pasar por el pipeline.
 """
 
-import os
+import logging
 import time
-from pathlib import Path
 from typing import Dict, Optional
 import numpy as np
-from dotenv import load_dotenv
 
 try:
     from sentence_transformers import SentenceTransformer
@@ -24,12 +22,7 @@ try:
 except ImportError:
     print("⚠️  Dependencias no instaladas para cache semántico.")
 
-# Cargar .env
-_script_dir = Path(__file__).resolve().parent
-_project_root = _script_dir.parent.parent
-_env_path = _project_root / ".env"
-if _env_path.exists():
-    load_dotenv(_env_path)
+logger = logging.getLogger(__name__)
 
 
 class SemanticCache:
@@ -38,9 +31,9 @@ class SemanticCache:
     def __init__(
         self,
         model: SentenceTransformer = None,
-        threshold: float = None,
-        ttl_seconds: int = None,
-        max_size: int = None,
+        threshold: float = 0.92,
+        ttl_seconds: int = 3600,
+        max_size: int = 100,
     ):
         """
         Inicializa el cache semántico.
@@ -51,13 +44,6 @@ class SemanticCache:
             ttl_seconds: Tiempo de vida de cada entrada en segundos
             max_size: Número máximo de entradas en cache
         """
-        # Config desde env con defaults sensatos
-        if threshold is None:
-            threshold = float(os.getenv("CACHE_THRESHOLD", "0.92"))
-        if ttl_seconds is None:
-            ttl_seconds = int(os.getenv("CACHE_TTL_SECONDS", "3600"))
-        if max_size is None:
-            max_size = int(os.getenv("CACHE_MAX_SIZE", "100"))
 
         self.threshold = threshold
         self.ttl_seconds = ttl_seconds
@@ -73,8 +59,8 @@ class SemanticCache:
         self.hits = 0
         self.misses = 0
 
-        print(
-            f"🗄️  Cache semántico inicializado "
+        logger.info(
+            f"Cache semántico inicializado "
             f"(threshold={self.threshold}, ttl={self.ttl_seconds}s, max={self.max_size})"
         )
 

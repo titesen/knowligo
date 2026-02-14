@@ -8,12 +8,11 @@ Este módulo:
 4. Registra queries para analytics
 """
 
-import os
 import sqlite3
+import logging
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Dict, Optional
-from dotenv import load_dotenv
 
 # Importar componentes del RAG
 from .validator import QueryValidator
@@ -23,78 +22,96 @@ from .cache import SemanticCache
 from .responder import GroqResponder
 from .intent import IntentClassifier
 
+logger = logging.getLogger(__name__)
+
 
 class RAGPipeline:
     """Pipeline principal que orquesta el sistema RAG"""
 
-    def __init__(self, db_path: str = None, max_queries_per_hour: int = None):
+    def __init__(
+        self, db_path: str = None, max_queries_per_hour: int = None, settings=None
+    ):
         """
         Inicializa el pipeline con todos los componentes.
 
         Args:
             db_path: Ruta a la base de datos SQLite
             max_queries_per_hour: Límite de queries por usuario por hora
+            settings: Instancia de Settings (si None, carga automáticamente)
         """
-        # Cargar config
-        project_root = Path(__file__).resolve().parent.parent.parent
-        env_path = project_root / ".env"
+        # Cargar config centralizada
+        if settings is None:
+            from api.config import get_settings
 
-        if env_path.exists():
-            load_dotenv(env_path)
+            settings = get_settings()
+
+        self._settings = settings
 
         # Configurar DB
         if db_path is None:
-            db_path = project_root / "database" / "sqlite" / "knowligo.db"
+            db_path = settings.db_full_path
         self.db_path = Path(db_path)
 
         # Rate limiting config
-        self.max_queries_per_hour = max_queries_per_hour or int(
-            os.getenv("MAX_QUERIES_PER_HOUR", "15")
+        self.max_queries_per_hour = (
+            max_queries_per_hour or settings.MAX_QUERIES_PER_HOUR
         )
 
         # Retrieval config (más candidatos para reranking)
-        self.top_k = int(os.getenv("TOP_K_RETRIEVAL", "15"))
-        self.rerank_enabled = os.getenv("RERANK_ENABLED", "true").lower() == "true"
-        self.cache_enabled = os.getenv("CACHE_ENABLED", "true").lower() == "true"
+        self.top_k = settings.TOP_K_RETRIEVAL
+        self.rerank_enabled = settings.RERANK_ENABLED
+        self.cache_enabled = settings.CACHE_ENABLED
 
         # Inicializar componentes
-        print("🚀 Inicializando RAG Pipeline...")
+        logger.info("Inicializando RAG Pipeline...")
 
         try:
             self.validator = QueryValidator()
-            print("✅ Validator cargado")
+            logger.info("Validator cargado")
 
-            self.retriever = FAISSRetriever()
-            print("✅ Retriever cargado")
+            self.retriever = FAISSRetriever(model_name=settings.EMBEDDING_MODEL)
+            logger.info("Retriever cargado")
 
-            self.responder = GroqResponder()
-            print("✅ Responder cargado")
+            self.responder = GroqResponder(
+                api_key=settings.GROQ_API_KEY,
+                model=settings.LLM_MODEL,
+                max_words=settings.MAX_MESSAGE_LENGTH,
+            )
+            logger.info("Responder cargado")
 
             self.intent_classifier = IntentClassifier()
-            print("✅ Intent Classifier cargado")
+            logger.info("Intent Classifier cargado")
 
             if self.rerank_enabled:
-                self.reranker = CrossEncoderReranker()
-                print("✅ Reranker cargado")
+                self.reranker = CrossEncoderReranker(
+                    model_name=settings.RERANK_MODEL,
+                    top_n=settings.RERANK_TOP_N,
+                )
+                logger.info("Reranker cargado")
             else:
                 self.reranker = None
-                print("ℹ️  Reranker deshabilitado")
+                logger.info("Reranker deshabilitado")
 
             if self.cache_enabled:
-                self.cache = SemanticCache(model=self.retriever.model)
-                print("✅ Cache semántico cargado")
+                self.cache = SemanticCache(
+                    model=self.retriever.model,
+                    threshold=settings.CACHE_THRESHOLD,
+                    ttl_seconds=settings.CACHE_TTL_SECONDS,
+                    max_size=settings.CACHE_MAX_SIZE,
+                )
+                logger.info("Cache semántico cargado")
             else:
                 self.cache = None
-                print("ℹ️  Cache semántico deshabilitado")
+                logger.info("Cache semántico deshabilitado")
 
             # Inicializar tabla de logs si no existe
             self._init_query_logs_table()
-            print("✅ Database configurada")
+            logger.info("Database configurada")
 
-            print("\n🎉 Pipeline listo para procesar queries\n")
+            logger.info("Pipeline listo para procesar queries")
 
         except Exception as e:
-            print(f"❌ Error inicializando pipeline: {e}")
+            logger.error(f"Error inicializando pipeline: {e}")
             raise
 
     def process_query(
