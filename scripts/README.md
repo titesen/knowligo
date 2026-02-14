@@ -9,7 +9,7 @@ Scripts de utilidad para inicializar, validar y probar el sistema.
 ### 🚀 `quick_start.py`
 **Inicio rápido de todos los servicios**
 
-Inicia automáticamente todos los servicios necesarios (API + n8n) y ejecuta validación completa.
+Inicia automáticamente todos los servicios necesarios (API) y ejecuta validación completa.
 
 ```powershell
 python scripts\quick_start.py
@@ -20,9 +20,8 @@ python scripts\quick_start.py
 2. Detiene servicios existentes
 3. Inicia servicios con `docker-compose up -d`
 4. Espera a que API esté lista (max 60s)
-5. Espera a que n8n esté listo (max 60s)
-6. Ejecuta validación completa (`validate_demo.py`)
-7. Muestra próximos pasos para WhatsApp
+5. Ejecuta validación completa (`validate_demo.py`)
+6. Muestra próximos pasos para WhatsApp
 
 **Cuándo usar:**
 - Primera vez configurando el proyecto
@@ -45,9 +44,7 @@ python scripts\validate_demo.py
 2. ✅ Base de datos SQLite inicializada con datos
 3. ✅ Índice FAISS construido con chunks
 4. ✅ API corriendo y respondiendo
-5. ✅ n8n corriendo y accesible
-6. ✅ Workflow de n8n existe
-7. ✅ Query de prueba funciona correctamente
+5. ✅ Query de prueba funciona correctamente
 
 **Output:**
 - ✅ Checks pasados (verde)
@@ -105,16 +102,11 @@ Script interactivo con menú de opciones para gestionar el proyecto.
 ```
 
 **Opciones del menú:**
-1. Iniciar todos los servicios (Docker Compose)
-2. Detener todos los servicios
-3. Ver logs en tiempo real
-4. Ejecutar tests
-5. Validar configuración
-6. Reconstruir índice FAISS
-7. Reinicializar base de datos
-8. Abrir Swagger UI
-9. Abrir n8n
-10. Salir
+1. Iniciar API (desarrollo local)
+2. Ejecutar tests automáticos
+3. Iniciar con Docker
+4. Ver documentación API (Swagger)
+5. Salir
 
 **Cuándo usar:**
 - Gestión diaria del proyecto
@@ -140,10 +132,10 @@ python scripts\utils\init_db.py
 3. Ejecuta `database/seeds/seed.sql` (datos de prueba)
 
 **Datos creados:**
-- 2 clientes (TechStart SAS, MediHealth Ltda)
+- 8 clientes
 - 3 planes (Basic, Professional, Enterprise)
-- 2 contratos
-- 2 tickets de ejemplo
+- 8 contratos
+- 17 tickets de ejemplo
 
 **Cuándo usar:**
 - Primera configuración del proyecto

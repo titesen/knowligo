@@ -70,8 +70,8 @@
 **Componentes:**
 - **Validator:** Filtra consultas off-topic (insultos, spam, temas no relacionados)
 - **Intent Classifier:** Clasifica intención (planes, SLA, mantenimiento, tickets, FAQs, empresa)
-- **Retriever:** Búsqueda vectorial en FAISS con embeddings all-MiniLM-L6-v2
-- **Responder:** Generación de respuestas naturales con Groq API (Mixtral-8x7b)
+- **Retriever:** Búsqueda vectorial en FAISS con embeddings paraphrase-multilingual-MiniLM-L12-v2
+- **Responder:** Generación de respuestas naturales con Groq API (Llama 3.3 70B)
 
 **Flujo:**
 ```
@@ -83,9 +83,9 @@ User Query → Validation → Intent → Retrieval → LLM Response → WhatsApp
 **Descripción:** Canal de comunicación principal vía WhatsApp Business API.
 
 **Implementación:**
-- n8n workflow como orquestador
-- Webhook para recibir mensajes
-- HTTP Request node para enviar respuestas
+- FastAPI webhook directo para recibir/enviar mensajes
+- Verificación de webhook con token
+- Envío de respuestas vía WhatsApp Cloud API
 - Gestión de sesiones de usuario
 
 **Capacidades:**
@@ -98,8 +98,8 @@ User Query → Validation → Intent → Retrieval → LLM Response → WhatsApp
 **Descripción:** Protección contra uso indebido y DoS.
 
 **Características:**
-- Rate limiting: 10 consultas/hora por usuario (configurable)
-- Límite de longitud de mensaje: 120 caracteres (configurable)
+- Rate limiting: 15 consultas/hora por usuario (configurable)
+- Límite de longitud de mensaje: 150 caracteres (configurable)
 - Detección de contenido inapropiado
 - Blacklist de usuarios abusivos
 
@@ -168,7 +168,7 @@ User Query → Validation → Intent → Retrieval → LLM Response → WhatsApp
 **Criterios de Aceptación:**
 - [ ] Detectar insultos y lenguaje ofensivo
 - [ ] Rechazar consultas sobre temas no IT/soporte
-- [ ] Limitar longitud de mensajes a 120 caracteres
+- [ ] Limitar longitud de mensajes a 150 caracteres
 - [ ] Proporcionar mensaje explicativo al rechazar
 
 ### RF-03: Clasificación de Intención
@@ -220,7 +220,7 @@ User Query → Validation → Intent → Retrieval → LLM Response → WhatsApp
 **Descripción:** Limitar consultas por usuario para prevenir abuso.
 
 **Criterios de Aceptación:**
-- [ ] Máximo 10 queries/hora por user_id
+- [ ] Máximo 15 queries/hora por user_id
 - [ ] Mensaje claro cuando se excede límite
 - [ ] Reset automático después de 1 hora
 - [ ] Configuración via variable de entorno
@@ -325,13 +325,14 @@ User Query → Validation → Intent → Retrieval → LLM Response → WhatsApp
 
 **Backend:**
 - Python 3.11+
-- FastAPI 0.109+ (framework web)
+- FastAPI 0.115+ (framework web)
 - Uvicorn (ASGI server)
 
 **RAG Components:**
-- Sentence Transformers 2.5.1 (embeddings)
+- Sentence Transformers 3.3.1 (embeddings multilingües)
 - FAISS 1.13.2 (vector store)
-- Groq API 0.4.2 (LLM - Mixtral-8x7b)
+- Groq API 0.11.0 (LLM - Llama 3.3 70B)
+- Cross-Encoder ms-marco-MiniLM-L-6-v2 (reranking)
 
 **Data:**
 - SQLite3 (logs, analytics)
@@ -339,12 +340,11 @@ User Query → Validation → Intent → Retrieval → LLM Response → WhatsApp
 - Markdown (documentos fuente)
 
 **Integration:**
-- n8n (workflow automation)
-- WhatsApp Business API
+- WhatsApp Business Cloud API (webhook directo en FastAPI)
 
 **DevOps:**
 - Docker & Docker Compose
-- Python-dotenv (config)
+- Pydantic Settings (config centralizada)
 
 ### Arquitectura de Sistema
 
@@ -361,17 +361,9 @@ User Query → Validation → Intent → Retrieval → LLM Response → WhatsApp
                            │
                            ▼
 ┌─────────────────────────────────────────────────────────────┐
-│                      n8n Workflow                            │
-│  ┌────────────┐  ┌────────────┐  ┌────────────┐            │
-│  │  Webhook   │→ │ HTTP Req   │→ │  Response  │            │
-│  │  Trigger   │  │ to API     │  │  to WA     │            │
-│  └────────────┘  └────────────┘  └────────────┘            │
-└──────────────────────────┬──────────────────────────────────┘
-                           │
-                           ▼
-┌─────────────────────────────────────────────────────────────┐
 │                    FastAPI (api/main.py)                     │
 │  ┌────────────────────────────────────────────────────┐     │
+│  │  GET/POST /webhook  (WhatsApp verification + msgs) │     │
 │  │  POST /query                                       │     │
 │  │  - Recibe: user_id, message, history              │     │
 │  │  - Retorna: response, intent, sources, metadata   │     │
@@ -402,7 +394,7 @@ User Query → Validation → Intent → Retrieval → LLM Response → WhatsApp
 │                                                              │
 │  5. Response Generation (responder.py)                       │
 │     ├─ Build prompt with context + query                    │
-│     ├─ Call Groq API (Mixtral-8x7b)                         │
+│     ├─ Call Groq API (Llama 3.3 70B)                       │
 │     └─ Return: response + token count                       │
 │                                                              │
 │  6. Logging                                                  │
@@ -438,7 +430,7 @@ External APIs:
 │   (LLM Inference)    │
 │                      │
 │   Model:             │
-│   mixtral-8x7b-32768 │
+│   llama-3.3-70b      │
 └──────────────────────┘
 ```
 
@@ -451,7 +443,7 @@ External APIs:
 
 2. **Query Processing:**
    ```
-   WhatsApp msg → n8n → FastAPI → Pipeline → Validator → Intent
+   WhatsApp msg → FastAPI /webhook → Pipeline → Validator → Intent
                                           ↓
    Response ← LLM ← Prompt Builder ← Retriever ← Query Embedding
    ```
@@ -500,15 +492,17 @@ knowligo/
 │       ├── services.md
 │       └── sla.md
 │
-├── n8n/
-│   └── workflows/
-│       └── whatsapp-rag-chatbot.json  # Workflow n8n
-│
 ├── scripts/
 │   ├── start.ps1          # Script inicio
 │   ├── test_api.py        # Tests API
 │   └── utils/
 │       └── init_db.py     # Inicializa DB
+│
+├── tests/                 # Tests con pytest
+│   ├── test_health.py
+│   ├── test_query.py
+│   ├── test_webhook.py
+│   └── test_errors.py
 │
 ├── docker-compose.yml     # Orquestación servicios
 ├── Dockerfile             # Imagen API
@@ -528,42 +522,40 @@ knowligo/
    ↓
 2. WhatsApp Business API recibe mensaje
    ↓
-3. Webhook de n8n se activa
+3. Webhook de FastAPI recibe el POST en /webhook
    ↓
-4. n8n extrae:
+4. FastAPI extrae:
    - user_id: +549xxxxxxxxx
    - message: "¿Qué planes tienen?"
    ↓
-5. n8n hace POST a http://api:8000/query
-   Body: {"user_id": "+549xxx", "message": "¿Qué planes tienen?"}
+5. RAGPipeline.process_query()
    ↓
-6. FastAPI recibe request → RAGPipeline.process_query()
+6. Rate Limiter verifica: Usuario tiene 3/15 queries esta hora ✓
    ↓
-7. Rate Limiter verifica: Usuario tiene 3/10 queries esta hora ✓
-   ↓
-8. Validator verifica:
-   - Longitud OK (19 chars < 120)
+7. Validator verifica:
+   - Longitud OK (19 chars < 150)
    - No insultos
    - Topic relevante ✓
    ↓
-9. Intent Classifier:
+8. Intent Classifier:
    - Detecta keywords: "planes"
    - Intent: "planes" (confidence: 0.95)
    ↓
-10. Retriever:
+9. Retriever:
     - Genera embedding de query
     - Busca en FAISS
+    - Cross-Encoder reranking
     - Recupera top-3 chunks:
       1. plans.md - "Planes de servicio" (score: 0.78)
       2. plans.md - "Plan Básico" (score: 0.65)
       3. plans.md - "Plan Profesional" (score: 0.63)
    ↓
-11. Responder:
+10. Responder:
     - Construye prompt con contexto
-    - Llama a Groq API (Mixtral-8x7b)
+    - Llama a Groq API (Llama 3.3 70B)
     - Recibe respuesta generada
    ↓
-12. Response:
+11. Response:
     "KnowLigo ofrece tres planes de servicio:
      
      • Plan Básico ($199/mes): Soporte en horario laboral,
@@ -576,10 +568,10 @@ knowligo/
      
      ¿Querés más detalles de algún plan?"
    ↓
-13. Pipeline registra en SQLite:
+12. Pipeline registra en SQLite:
     - query, intent, response, timestamp, tokens_used
    ↓
-14. FastAPI retorna JSON a n8n:
+13. FastAPI retorna JSON:
     {
       "success": true,
       "response": "...",
@@ -587,9 +579,9 @@ knowligo/
       "sources": [{"file": "plans.md", ...}]
     }
    ↓
-15. n8n envía respuesta a WhatsApp
+14. FastAPI envía respuesta a WhatsApp vía Cloud API
    ↓
-16. Usuario recibe mensaje
+15. Usuario recibe mensaje
 ```
 
 ### Flujo Alternativo: Query Inválida
@@ -597,7 +589,7 @@ knowligo/
 ```
 1. Usuario envía "me das tu numero de celular bb?"
    ↓
-2-6. [Mismo flujo hasta Validator]
+2-4. [Mismo flujo hasta Validator]
    ↓
 7. Validator detecta:
    - Contenido inapropiado
@@ -617,14 +609,14 @@ knowligo/
 ### Flujo Alternativo: Rate Limit Excedido
 
 ```
-1. Usuario envía query #11 en la misma hora
+1. Usuario envía query #16 en la misma hora
    ↓
-2-5. [Mismo flujo inicial]
+2-3. [Mismo flujo inicial]
    ↓
-6. Rate Limiter verifica: 10/10 queries ✗
+4. Rate Limiter verifica: 15/15 queries ✗
    ↓
-7. Retorna:
-   "Has alcanzado el límite de 10 consultas por hora.
+5. Retorna:
+   "Has alcanzado el límite de 15 consultas por hora.
     Por favor, intenta nuevamente en 45 minutos."
    ↓
 8. [No procesa query]
@@ -674,13 +666,17 @@ knowligo/
 ### Fase 1: MVP (Completado - Feb 2026)
 
 - [x] Sistema RAG funcional
-- [x] Integración WhatsApp vía n8n
+- [x] Integración WhatsApp vía webhook FastAPI directo
 - [x] 6 intents básicos
 - [x] Rate limiting
 - [x] Logging básico
 - [x] API REST con FastAPI
 - [x] Docker Compose deployment
 - [x] Documentación inicial
+- [x] Tests unitarios con pytest (38 tests)
+- [x] Embeddings multilingües + Cross-Encoder reranking
+- [x] Caché semántico + Protección prompt injection
+- [x] Configuración centralizada (Pydantic Settings)
 
 ### Fase 2: Mejoras de UX (Mar 2026)
 
@@ -891,7 +887,7 @@ knowligo/
 - **LLM:** Large Language Model - modelo de lenguaje grande
 - **SLA:** Service Level Agreement - acuerdo de nivel de servicio
 - **PyME:** Pequeña y Mediana Empresa
-- **n8n:** Plataforma de automatización de workflows
+- **n8n:** Plataforma de automatización de workflows (ya no utilizada en la implementación actual)
 - **Groq:** Proveedor de inferencia de LLMs de alta velocidad
 
 ### B. Referencias
@@ -901,7 +897,6 @@ knowligo/
 - [Groq API Docs](https://console.groq.com/docs)
 - [FastAPI Documentation](https://fastapi.tiangolo.com/)
 - [WhatsApp Business API](https://developers.facebook.com/docs/whatsapp)
-- [n8n Documentation](https://docs.n8n.io/)
 
 ### C. Changelog del PRD
 

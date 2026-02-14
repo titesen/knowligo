@@ -7,6 +7,4 @@ database/schema/.keep
 database/seeds/.keep
 database/sqlite/.keep
 
-n8n/workflows/.keep
-scripts/ingest/.keep
 scripts/utils/.keep

@@ -77,9 +77,9 @@ class FAISSRetriever:
                 "Ejecuta primero: python rag/ingest/build_index.py"
             )
 
-        print(f"📥 Cargando índice FAISS desde: {self.index_path}")
+        logger.info(f"Cargando índice FAISS desde: {self.index_path}")
         self.index = faiss.read_index(str(self.index_path))
-        print(f"✅ Índice cargado ({self.index.ntotal} vectores)")
+        logger.info(f"Índice cargado ({self.index.ntotal} vectores)")
 
         # Cargar metadata de chunks desde pickle
         chunks_path = self.metadata_path.parent / "chunks.pkl"
@@ -94,12 +94,12 @@ class FAISSRetriever:
             self.chunks = pickle.load(f)
 
         if len(self.chunks) != self.index.ntotal:
-            print(
-                f"⚠️  Warning: Número de chunks ({len(self.chunks)}) "
+            logger.warning(
+                f"Número de chunks ({len(self.chunks)}) "
                 f"no coincide con vectores en índice ({self.index.ntotal})"
             )
         else:
-            print(f"✅ {len(self.chunks)} chunks cargados")
+            logger.info(f"{len(self.chunks)} chunks cargados")
 
     def retrieve(
         self, query: str, top_k: int = 3, score_threshold: float = None
@@ -175,74 +175,3 @@ class FAISSRetriever:
                 context_parts.append(f"[{source}]\n{text}")
 
         return "\n\n".join(context_parts)
-
-
-# Instancia singleton
-_retriever_instance = None
-
-
-def get_retriever() -> FAISSRetriever:
-    """Obtiene una instancia singleton del retriever"""
-    global _retriever_instance
-    if _retriever_instance is None:
-        _retriever_instance = FAISSRetriever()
-    return _retriever_instance
-
-
-def retrieve_context(query: str, top_k: int = 3) -> Tuple[List[Dict], str]:
-    """
-    Función de conveniencia para recuperar contexto.
-
-    Args:
-        query: Consulta del usuario
-        top_k: Número de chunks a recuperar
-
-    Returns:
-        Tuple de (results: List[Dict], formatted_context: str)
-    """
-    retriever = get_retriever()
-    results = retriever.retrieve(query, top_k=top_k)
-    context = retriever.format_context(results)
-    return results, context
-
-
-# Script de prueba
-if __name__ == "__main__":
-    print("🔍 Testing FAISS Retriever\n")
-
-    try:
-        retriever = FAISSRetriever()
-
-        test_queries = [
-            "¿Qué planes de soporte ofrecen?",
-            "¿Cuál es el SLA para tickets High?",
-            "¿Hacen mantenimiento preventivo?",
-        ]
-
-        for query in test_queries:
-            print(f"\n{'=' * 60}")
-            print(f"Query: {query}")
-            print("=" * 60)
-
-            results = retriever.retrieve(query, top_k=3)
-
-            if results:
-                print(f"\n✅ Encontrados {len(results)} chunks relevantes:\n")
-                for result in results:
-                    print(f"Rank: {result['rank']} | Score: {result['score']:.4f}")
-                    print(f"Source: {result['metadata'].get('source', 'N/A')}")
-                    print(f"Text: {result['text'][:200]}...")
-                    print()
-
-                print("\n📝 Contexto formateado:")
-                print("-" * 60)
-                context = retriever.format_context(results)
-                print(context[:500] + "..." if len(context) > 500 else context)
-            else:
-                print("❌ No se encontraron chunks relevantes")
-
-    except FileNotFoundError as e:
-        print(f"❌ Error: {e}")
-        print("\n💡 Ejecuta primero: python rag/ingest/build_index.py")
-    except Exception as e:
-        print(f"❌ Error inesperado: {e}")

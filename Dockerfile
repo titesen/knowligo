@@ -35,17 +35,19 @@ ENV PATH="/opt/venv/bin:$PATH"
 RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
     pip install --no-cache-dir \
         # Web framework (ligero, instalar primero)
-        fastapi==0.109.2 \
-        uvicorn[standard]==0.27.1 \
-        pydantic==2.6.1 \
-        requests==2.31.0 \
+        fastapi==0.115.0 \
+        uvicorn[standard]==0.30.6 \
+        pydantic==2.9.2 \
+        pydantic-settings==2.12.0 \
+        requests==2.32.3 \
+        httpx==0.27.2 \
         python-dotenv==1.0.1 \
-        markdown==3.5.2 \
-        groq==0.4.2 && \
+        markdown==3.7 \
+        groq==0.11.0 && \
     pip install --no-cache-dir \
         # ML libraries (pesadas, con wheels pre-compilados)
         faiss-cpu==1.13.2 \
-        sentence-transformers==2.5.1 && \
+        sentence-transformers==3.3.1 && \
     # Limpiar archivos temporales de Python
     find /opt/venv -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true && \
     find /opt/venv -type f -name '*.pyc' -delete && \

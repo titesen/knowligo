@@ -3,7 +3,7 @@
 **Proyecto educativo**: Chatbot inteligente de soporte IT para WhatsApp usando RAG (Retrieval-Augmented Generation) con FAISS y Groq LLM.
 
 [![Python](https://img.shields.io/badge/Python-3.11+-blue.svg)](https://python.org)
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.109+-green.svg)](https://fastapi.tiangolo.com)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-green.svg)](https://fastapi.tiangolo.com)
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 ## 📋 Descripción
@@ -12,8 +12,8 @@ KnowLigo es una empresa ficticia de soporte IT para PyMEs. Este proyecto impleme
 
 - ✅ Responde consultas sobre **planes de servicio**, **SLAs**, **mantenimiento** y **tickets**
 - ✅ Usa **RAG** (vectorización con FAISS + embeddings) para recuperar información relevante
-- ✅ Genera respuestas naturales con **Groq API** (Mixtral-8x7b)
-- ✅ Integra con **WhatsApp Business API** vía **n8n**
+- ✅ Genera respuestas naturales con **Groq API** (Llama 3.3 70B)
+- ✅ Integra con **WhatsApp Business API** vía webhook directo en FastAPI
 - ✅ Controla respuestas on-topic, rate limiting y abuse prevention
 - ✅ 100% gratuito (usa APIs free tier)
 
@@ -22,12 +22,13 @@ KnowLigo es una empresa ficticia de soporte IT para PyMEs. Este proyecto impleme
 ```
 Usuario (WhatsApp)
     ↓
-n8n Workflow (webhook)
+FastAPI /webhook (api/main.py)
     ↓
-FastAPI (rag/query/pipeline.py)
-    ├── Validator (topic control)
+RAG Pipeline (rag/query/pipeline.py)
+    ├── Validator (topic control + prompt injection)
     ├── Intent Classifier
-    ├── Retriever (FAISS vector search)
+    ├── Retriever (FAISS + Cross-Encoder reranking)
+    ├── Semantic Cache
     └── Responder (Groq LLM)
     ↓
 Respuesta → WhatsApp
@@ -94,9 +95,6 @@ docker-compose up -d
 
 # Ver logs
 docker-compose logs -f
-
-# Acceder a n8n
-# http://localhost:5678 (user: admin, pass: knowligo2026)
 ```
 
 ### 6. Validar instalación
@@ -114,18 +112,21 @@ python scripts\validate_demo.py
 ```
 knowligo/
 ├── api/                    # FastAPI application
-│   ├── main.py            # Endpoints REST
-│   └── models.py          # Pydantic schemas
+│   ├── main.py            # Endpoints REST + webhook WhatsApp
+│   ├── models.py          # Pydantic schemas
+│   └── config.py          # Configuración centralizada (BaseSettings)
 ├── rag/
 │   ├── ingest/            # Pipeline de vectorización
 │   │   ├── build_index.py # Crear índice FAISS
 │   │   └── chunker.py     # Procesamiento de documentos
 │   ├── query/             # Pipeline de consultas
 │   │   ├── pipeline.py    # Orquestador principal
-│   │   ├── validator.py   # Control de dominio
+│   │   ├── validator.py   # Control de dominio + prompt injection
 │   │   ├── retriever.py   # Búsqueda vectorial FAISS
 │   │   ├── responder.py   # Generación LLM (Groq)
-│   │   └── intent.py      # Clasificación de intención
+│   │   ├── intent.py      # Clasificación de intención
+│   │   ├── reranker.py    # Cross-Encoder reranking
+│   │   └── cache.py       # Caché semántico
 │   └── store/             # Índices y chunks
 │       ├── faiss.index    # Índice vectorial
 │       ├── chunks.pkl     # Chunks procesados
@@ -137,11 +138,13 @@ knowligo/
 │   ├── schema/            # Schema SQL
 │   ├── seeds/             # Datos de prueba
 │   └── sqlite/            # Base de datos
-├── n8n/
-│   ├── workflows/         # WhatsApp workflow
-│   └── credentials/       # Config de credenciales
+├── tests/                 # Tests con pytest
+│   ├── test_health.py
+│   ├── test_query.py
+│   ├── test_webhook.py
+│   └── test_errors.py
 ├── scripts/
-│   ├── test_api.py        # Tests automatizados
+│   ├── test_api.py        # Tests funcionales manuales
 │   ├── validate_demo.py   # Validación pre-demo
 │   ├── quick_start.py     # Inicio rápido de servicios
 │   ├── start.ps1          # Script PowerShell interactivo
@@ -161,21 +164,15 @@ knowligo/
    - Obtén `Phone Number ID` y `Access Token`
 
 2. **Configurar Webhook**:
-   - URL: `https://tu-dominio.com/webhook/whatsapp-webhook`
-   - Verify Token: `knowligo_webhook_verify_token`
+   - URL: `https://tu-dominio.com/webhook`
+   - Verify Token: `knowligo_webhook_2026`
    - Fields: `messages`
 
 3. **Para desarrollo local, usa ngrok**:
    ```bash
-   ngrok http 5678
+   ngrok http 8000
    ```
    Usa la URL HTTPS como Callback URL en Meta.
-
-4. **Importar workflow en n8n**:
-   - Abre http://localhost:5678
-   - Importa `n8n/workflows/whatsapp-rag-chatbot.json`
-   - Configura credenciales (ver `n8n/credentials/README.md`)
-   - Activa el workflow
 
 ### Opción B: Solo API (sin WhatsApp)
 
@@ -189,9 +186,23 @@ curl -X POST http://localhost:8000/query `
 
 ## 🧪 Testing
 
-### Test automático del pipeline
+### Tests unitarios con pytest
 
 ```powershell
+# Ejecutar todos los tests
+python -m pytest tests/ -v
+
+# Tests específicos
+python -m pytest tests/test_health.py -v
+python -m pytest tests/test_query.py -v
+python -m pytest tests/test_webhook.py -v
+python -m pytest tests/test_errors.py -v
+```
+
+### Test funcional del pipeline
+
+```powershell
+# Requiere API corriendo
 python scripts\test_api.py
 ```
 
@@ -199,25 +210,6 @@ Prueba queries de ejemplo:
 - "¿Qué planes de soporte ofrecen?" → Intent: planes
 - "¿Cuál es el SLA para tickets High?" → Intent: sla
 - "Dame consejos de hacking" → Rechazado (fuera de dominio)
-
-### Probar componentes individuales
-
-```powershell
-# Validator
-python rag\query\validator.py
-
-# Retriever
-python rag\query\retriever.py
-
-# Intent Classifier
-python rag\query\intent.py
-
-# Responder (requiere GROQ_API_KEY en .env)
-python rag\query\responder.py
-
-# Pipeline completo
-python rag\query\pipeline.py
-```
 
 ## 📊 Endpoints de la API
 
@@ -260,11 +252,11 @@ Estadísticas de uso (queries procesadas, intents, etc.).
 - Rechaza: hacking, política, opiniones personales, topics no relacionados
 
 ### Rate Limiting
-- Máximo **10 queries por usuario por hora**
+- Máximo **15 queries por usuario por hora**
 - Configurable en `.env` (`MAX_QUERIES_PER_HOUR`)
 
 ### Response Control
-- Máximo **120 palabras** por respuesta
+- Máximo **150 palabras** por respuesta
 - Tono **profesional, conciso, serio**
 - Solo usa información de la base de conocimiento
 
@@ -279,12 +271,12 @@ GROQ_API_KEY=gsk_xxxxxxxxxxxxx
 # WhatsApp Business Cloud API
 WHATSAPP_TOKEN=EAAxxxxxxxxxxxxx
 WHATSAPP_PHONE_NUMBER_ID=123456789012345
-WHATSAPP_VERIFY_TOKEN=knowligo_webhook_verify_token
+WHATSAPP_VERIFY_TOKEN=knowligo_webhook_2026
 
 # Configuración
-MAX_MESSAGE_LENGTH=120
-MAX_QUERIES_PER_HOUR=10
-LLM_MODEL=mixtral-8x7b-32768
+MAX_MESSAGE_LENGTH=150
+MAX_QUERIES_PER_HOUR=15
+LLM_MODEL=llama-3.3-70b-versatile
 ```
 
 ## 📈 Roadmap
@@ -293,9 +285,11 @@ LLM_MODEL=mixtral-8x7b-32768
 - [x] Integración Groq LLM
 - [x] API REST con FastAPI
 - [x] Validación de dominio y rate limiting
-- [x] Workflow n8n para WhatsApp
+- [x] Webhook WhatsApp directo en FastAPI
 - [x] Docker compose
-- [ ] Tests unitarios con pytest
+- [x] Tests unitarios con pytest (38 tests)
+- [x] Embeddings multilingüe + Cross-Encoder reranking
+- [x] Caché semántico + Protección contra prompt injection
 - [ ] Monitoreo con Prometheus/Grafana
 - [ ] Frontend web para administración
 - [ ] Soporte para múltiples idiomas
@@ -315,7 +309,6 @@ MIT License - Proyecto educativo de código abierto
 ## 🙏 Agradecimientos
 
 - [Groq](https://groq.com) por su LLM API gratuita
-- [n8n](https://n8n.io) por la plataforma de automatización
 - [Meta](https://developers.facebook.com) por WhatsApp Business API
 - [Sentence Transformers](https://www.sbert.net/) por los embeddings
 - [FAISS](https://github.com/facebookresearch/faiss) por el vector search

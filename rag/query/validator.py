@@ -10,8 +10,11 @@ Este módulo:
 
 import re
 import json
+import logging
 from pathlib import Path
 from typing import Tuple
+
+logger = logging.getLogger(__name__)
 
 
 """
@@ -316,60 +319,8 @@ class QueryValidator:
         """
         for pattern in _COMPILED_INJECTION_PATTERNS:
             if pattern.search(query_lower):
-                print(f"⚠️  Prompt injection detectado: patrón '{pattern.pattern}'")
+                logger.warning(
+                    f"Prompt injection detectado: patrón '{pattern.pattern}'"
+                )
                 return True
         return False
-
-
-# Funciones de conveniencia
-_validator_instance = None
-
-
-def get_validator() -> QueryValidator:
-    """Obtiene una instancia singleton del validador"""
-    global _validator_instance
-    if _validator_instance is None:
-        _validator_instance = QueryValidator()
-    return _validator_instance
-
-
-def validate_query(query: str) -> Tuple[bool, str]:
-    """
-    Función de conveniencia para validar una query.
-
-    Args:
-        query: Consulta a validar
-
-    Returns:
-        Tuple de (is_valid, reason)
-    """
-    validator = get_validator()
-    return validator.is_valid_query(query)
-
-
-# Script de prueba
-if __name__ == "__main__":
-    print("🔍 Testing Query Validator\n")
-
-    test_queries = [
-        ("¿Qué planes de soporte ofrecen?", True),
-        ("¿Cuál es el SLA para tickets High?", True),
-        ("Necesito ayuda con mi servidor", True),
-        ("Dame consejos de hacking", False),
-        ("¿Cuál es tu opinión política?", False),
-        ("¿Puedes recomendarme un celular?", False),
-        ("¿Qué es KnowLigo?", True),
-        ("¿Hacen mantenimiento preventivo?", True),
-    ]
-
-    validator = QueryValidator()
-
-    for query, expected_valid in test_queries:
-        is_valid, reason = validator.is_valid_query(query)
-        status = "✅" if is_valid == expected_valid else "❌"
-
-        print(f"{status} Query: '{query}'")
-        print(f"   Valid: {is_valid}")
-        if not is_valid:
-            print(f"   Reason: {reason}")
-        print()

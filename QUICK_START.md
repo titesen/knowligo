@@ -57,29 +57,14 @@ python rag\ingest\build_index.py
 docker-compose up -d
 
 # Opción B: Sin Docker (desarrollo)
-# Terminal 1:
 python api\main.py
-
-# Terminal 2:
-npx n8n
 ```
 
 ### 5️⃣ Configurar Ngrok
 
-> **IMPORTANTE**: Elige UNA de las dos opciones (A o B) según cómo quieras manejar el webhook.
-
-#### Opción A: Webhook directo por FastAPI (RECOMENDADO - más simple)
-
 ```powershell
 # Ngrok apunta a la API FastAPI (puerto 8000)
 ngrok http 8000
-```
-
-#### Opción B: Webhook por n8n (más complejo)
-
-```powershell
-# Ngrok apunta a n8n (puerto 5678)
-ngrok http 5678
 ```
 
 Copia la URL HTTPS (ej: `https://abc123.ngrok-free.app`)
@@ -88,32 +73,12 @@ Copia la URL HTTPS (ej: `https://abc123.ngrok-free.app`)
 
 1. Ve a https://developers.facebook.com/apps
 2. Tu app → WhatsApp → Configuration → Webhook
-
-**Si elegiste Opción A (FastAPI directo):**
 3. **Callback URL**: `https://TU-URL-NGROK.ngrok-free.app/webhook`
 4. **Verify token**: `knowligo_webhook_2026`
 5. Click **"Verify and save"**
 6. Suscribirse a **"messages"**
 
-**Si elegiste Opción B (n8n):**
-3. **Callback URL**: `https://TU-URL-NGROK.ngrok-free.app/webhook/whatsapp-webhook`
-4. **Verify token**: `knowligo_webhook_2026`
-5. Click **"Verify and save"**
-6. Suscribirse a **"messages"**
-
-### 7️⃣ Configurar n8n (solo si elegiste Opción B)
-
-1. Abre http://localhost:5678 (admin / knowligo2026)
-2. Credentials → Add
-   - Type: **Header Auth**
-   - Name: `WhatsApp Bearer Token`
-   - Header: `Authorization`
-   - Value: `Bearer TU_WHATSAPP_TOKEN`
-3. Workflows → Import → `n8n/workflows/whatsapp-rag-chatbot.json`
-4. Configurar credenciales en nodos "Send WhatsApp"
-5. Activar workflow (switch ON)
-
-### 8️⃣ Probar
+### 7️⃣ Probar
 
 1. Agrega tu número en Meta Developers (API Setup → Add phone number)
 2. Envía mensaje al número de prueba:
@@ -131,13 +96,12 @@ Copia la URL HTTPS (ej: `https://abc123.ngrok-free.app`)
 1. **Arquitectura** (diagrama del README)
 2. **Swagger UI** (http://localhost:8000/docs)
    - Ejecutar query manualmente
-3. **n8n Workflow** (mostrar nodos)
-4. **WhatsApp en vivo**:
+3. **WhatsApp en vivo**:
    - Enviar: "¿Qué planes ofrecen?"
    - Enviar: "¿Cuál es el SLA para tickets High?"
    - Enviar: "Dame consejos de hacking" (debe rechazar)
-5. **Logs en tiempo real** (`docker-compose logs -f`)
-6. **Stats endpoint** (http://localhost:8000/stats)
+4. **Tests** (`python -m pytest tests/ -v`)
+5. **Stats endpoint** (http://localhost:8000/stats)
 
 ### Queries de ejemplo para demo:
 
@@ -159,20 +123,17 @@ Copia la URL HTTPS (ej: `https://abc123.ngrok-free.app`)
 
 ### Webhook no verifica
 ```powershell
-# Verificar que n8n esté corriendo
-curl http://localhost:5678
+# Verificar que la API esté corriendo
+curl http://localhost:8000/health
 
 # Ver logs
-docker-compose logs -f n8n
+docker-compose logs -f api
 ```
 
 ### No recibo respuestas
 ```powershell
 # Ver logs de API
 docker-compose logs -f api
-
-# Ver execuciones en n8n UI
-http://localhost:5678 → Executions
 ```
 
 ### API lenta
@@ -187,7 +148,6 @@ http://localhost:5678 → Executions
 |----------|-----|--------------|
 | API | http://localhost:8000 | - |
 | API Docs | http://localhost:8000/docs | - |
-| n8n | http://localhost:5678 | admin / knowligo2026 |
 | Health | http://localhost:8000/health | - |
 | Stats | http://localhost:8000/stats | - |
 
@@ -198,12 +158,10 @@ http://localhost:5678 → Executions
 ```
 [ ] .env configurado con credenciales reales
 [ ] Base de datos inicializada
-[ ] Índice FAISS construido (25 vectores)
-[ ] Docker Compose up (API + n8n)
+[ ] Índice FAISS construido (122 vectores)
+[ ] Docker Compose up (API)
 [ ] Ngrok corriendo
 [ ] Webhook verificado en Meta ✅
-[ ] Credenciales configuradas en n8n
-[ ] Workflow importado y activado
 [ ] Tu número agregado en Meta
 [ ] Mensaje de prueba enviado → respuesta recibida ✅
 [ ] Cámara/screen recorder listos 🎥

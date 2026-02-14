@@ -123,7 +123,7 @@ Responde de manera profesional, concisa y basándote ÚNICAMENTE en el contexto 
 
         except Exception as e:
             error_msg = f"Error al generar respuesta: {str(e)}"
-            print(f"❌ {error_msg}")
+            logger.error(error_msg)
 
             return {
                 "response": "Disculpe, tengo problemas técnicos en este momento. Por favor, intente nuevamente en unos momentos.",
@@ -199,75 +199,3 @@ Si le preguntan algo fuera de este ámbito, indique cortésmente que solo puede 
             truncated_text = truncated_text[: last_period + 1]
 
         return truncated_text, True
-
-
-# Instancia singleton
-_responder_instance = None
-
-
-def get_responder() -> GroqResponder:
-    """Obtiene una instancia singleton del responder"""
-    global _responder_instance
-    if _responder_instance is None:
-        _responder_instance = GroqResponder()
-    return _responder_instance
-
-
-def generate_response(query: str, context_chunks: List[Dict]) -> Dict[str, any]:
-    """
-    Función de conveniencia para generar respuestas.
-
-    Args:
-        query: Pregunta del usuario
-        context_chunks: Chunks de contexto
-
-    Returns:
-        Dict con response, model, tokens_used, etc.
-    """
-    responder = get_responder()
-    return responder.generate_response(query, context_chunks)
-
-
-# Script de prueba
-if __name__ == "__main__":
-    print("🤖 Testing Groq Responder\n")
-
-    # Chunks de ejemplo simulados
-    mock_chunks = [
-        {
-            "text": "KnowLigo ofrece tres planes: Basic ($199/mes, soporte 9-18h), Professional ($499/mes, soporte 24/7) y Enterprise (precio personalizado).",
-            "metadata": {"source": "plans.md", "section": "Planes"},
-        },
-        {
-            "text": "El SLA para tickets High es de 4 horas, Medium 8 horas y Low 24 horas.",
-            "metadata": {"source": "sla.md", "section": "Tiempos de Respuesta"},
-        },
-    ]
-
-    test_queries = [
-        "¿Qué planes ofrecen?",
-        "¿Cuál es el SLA para tickets urgentes?",
-        "¿Cuánto cuesta el plan básico?",
-    ]
-
-    try:
-        responder = GroqResponder()
-
-        for query in test_queries:
-            print(f"\n{'=' * 60}")
-            print(f"Query: {query}")
-            print("=" * 60)
-
-            result = responder.generate_response(query, mock_chunks)
-
-            print(f"\n📝 Respuesta:")
-            print(result["response"])
-            print(
-                f"\n📊 Tokens: {result['tokens_used']} | Truncated: {result['truncated']}"
-            )
-
-    except ValueError as e:
-        print(f"❌ {e}")
-        print("\n💡 Crea un archivo .env con tu GROQ_API_KEY")
-    except Exception as e:
-        print(f"❌ Error inesperado: {e}")

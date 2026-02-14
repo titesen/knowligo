@@ -7,7 +7,6 @@ Este módulo se encarga de:
 3. Preservar metadata (archivo fuente, secciones)
 """
 
-import os
 from pathlib import Path
 from typing import List, Dict
 import re

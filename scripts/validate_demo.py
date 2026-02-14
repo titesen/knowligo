@@ -193,72 +193,6 @@ def check_api_running():
         return False
 
 
-def check_n8n_running():
-    """Verifica que n8n esté corriendo"""
-    print_header("5. Verificando n8n")
-
-    try:
-        response = requests.get(
-            "http://localhost:5678", timeout=5, allow_redirects=False
-        )
-
-        if response.status_code in [200, 302, 401]:  # 401 = needs login (OK)
-            print_check(True, "n8n está corriendo")
-            print("   URL: http://localhost:5678")
-            print("   User: admin / Pass: knowligo2026")
-            return True
-        else:
-            print_check(
-                False, "n8n responde con error", f"Status: {response.status_code}"
-            )
-            return False
-
-    except requests.exceptions.ConnectionError:
-        print_check(False, "n8n no está corriendo")
-        print("   Ejecuta: docker-compose up -d")
-        print("   O: npx n8n")
-        return False
-    except Exception as e:
-        print_check(False, "Error al conectar con n8n", str(e))
-        return False
-
-
-def check_workflow_file():
-    """Verifica que el workflow de n8n exista"""
-    print_header("6. Verificando Workflow de n8n")
-
-    workflow_path = Path("n8n/workflows/whatsapp-rag-chatbot.json")
-
-    if not workflow_path.exists():
-        print_check(False, "Workflow no encontrado")
-        return False
-
-    import json
-
-    with open(workflow_path) as f:
-        workflow = json.load(f)
-
-    nodes = workflow.get("nodes", [])
-    node_names = [n.get("name") for n in nodes]
-
-    print_check(True, "Workflow existe")
-    print_check(True, f"Nodos en workflow", f"{len(nodes)} nodos")
-
-    # Verificar nodos críticos
-    critical_nodes = [
-        "WhatsApp Webhook",
-        "Verify Token",
-        "KnowLigo RAG API",
-        "Send WhatsApp (Success)",
-    ]
-
-    for node_name in critical_nodes:
-        has_node = node_name in node_names
-        print_check(has_node, f"  {node_name}")
-
-    return True
-
-
 def test_api_query():
     """Prueba una query de ejemplo en la API"""
     print_header("7. Probando Query de Ejemplo")
@@ -326,11 +260,9 @@ def print_summary(results):
         print("  🎉 ¡TODO LISTO PARA LA DEMO!")
         print("=" * 70)
         print("\nPróximos pasos:")
-        print("1. Configura ngrok: ngrok http 5678")
+        print("1. Configura ngrok: ngrok http 8000")
         print("2. Configura webhook en Meta Developers")
-        print("3. Importa workflow en n8n")
-        print("4. Activa workflow en n8n")
-        print("5. Envía mensaje de prueba a WhatsApp")
+        print("3. Envía mensaje de prueba a WhatsApp")
         print("\nVer WHATSAPP_SETUP.md para instrucciones detalladas")
     else:
         print("\n" + "=" * 70)
@@ -357,9 +289,6 @@ def main():
     # Solo hacer estos si la API está corriendo
     if results["api_running"]:
         results["test_query"] = test_api_query()
-
-    results["n8n_running"] = check_n8n_running()
-    results["workflow_file"] = check_workflow_file()
 
     # Resumen
     print_summary(results)

@@ -55,7 +55,7 @@ Edita `D:\dev\learning\knowligo\.env`:
 # WhatsApp Business Cloud API
 WHATSAPP_PHONE_NUMBER_ID=123456789012345
 WHATSAPP_TOKEN=EAAxxxxxxxxxxxxxxxxxxxxx
-WHATSAPP_VERIFY_TOKEN=knowligo_webhook_verify_token
+WHATSAPP_VERIFY_TOKEN=knowligo_webhook_2026
 ```
 
 ---
@@ -72,13 +72,13 @@ WHATSAPP_VERIFY_TOKEN=knowligo_webhook_verify_token
 
 ```powershell
 # En una terminal separada
-ngrok http 5678
+ngrok http 8000
 ```
 
 Verás algo como:
 
 ```
-Forwarding    https://abcd-1234-5678.ngrok-free.app -> http://localhost:5678
+Forwarding    https://abcd-1234-5678.ngrok-free.app -> http://localhost:8000
 ```
 
 **Copia la URL HTTPS** (ej: `https://abcd-1234-5678.ngrok-free.app`)
@@ -99,12 +99,12 @@ Forwarding    https://abcd-1234-5678.ngrok-free.app -> http://localhost:5678
 
 **Callback URL**:
 ```
-https://TU-URL-DE-NGROK.ngrok-free.app/webhook/whatsapp-webhook
+https://TU-URL-DE-NGROK.ngrok-free.app/webhook
 ```
 
 Ejemplo:
 ```
-https://abcd-1234-5678.ngrok-free.app/webhook/whatsapp-webhook
+https://abcd-1234-5678.ngrok-free.app/webhook
 ```
 
 **Verify token**:
@@ -120,9 +120,9 @@ knowligo_webhook_2026
 3. Si todo está bien, verás ✅ **"Webhook verified"**
 
 **Si falla**:
-- Verifica que n8n esté corriendo
+- Verifica que la API esté corriendo (`http://localhost:8000/health`)
 - Verifica que ngrok esté activo
-- Revisa los logs de n8n para ver el error
+- Revisa los logs de la API para ver el error
 
 ### 3.4 Suscribirse a Eventos
 
@@ -143,62 +143,25 @@ knowligo_webhook_2026
 docker-compose up -d
 ```
 
-Espera ~30 segundos a que los servicios inicien.
+Espera ~30 segundos a que el servicio inicie.
 
-### 4.2 O iniciar solo n8n localmente
+### 4.2 O iniciar localmente (desarrollo)
 
 ```powershell
 # Activar entorno virtual
 .\.venv\Scripts\Activate.ps1
 
-# En una terminal: Iniciar API
+# Iniciar API
 python api\main.py
-
-# En otra terminal: Iniciar n8n (sin Docker)
-npx n8n
 ```
 
 ---
 
-## Paso 5: Configurar Credenciales en n8n
+## Paso 5: Verificar que la API esté lista
 
-### 5.1 Acceder a n8n
-
-1. Abre http://localhost:5678
-2. Usuario: `admin`
-3. Contraseña: `knowligo2026`
-
-### 5.2 Crear Credencial de WhatsApp
-
-1. Click en tu perfil (esquina superior derecha)
-2. **Settings** → **Credentials**
-3. Click **"Add Credential"**
-4. Busca **"Header Auth"**
-5. Configura:
-   - **Name**: `WhatsApp Bearer Token`
-   - **Header Name**: `Authorization`
-   - **Header Value**: `Bearer TU_WHATSAPP_TOKEN_AQUI`
-     - Ejemplo: `Bearer EAABsbCS1iHgBO...`
-6. Click **"Save"**
-
-### 5.3 Importar Workflow
-
-1. En n8n, click **"Workflows"** → **"Add Workflow"**
-2. Click **"⋮"** (tres puntos) → **"Import from File"**
-3. Selecciona: `n8n/workflows/whatsapp-rag-chatbot.json`
-4. El workflow se importará automáticamente
-
-### 5.4 Configurar Nodos que Usan Credenciales
-
-1. Busca los nodos **"Send WhatsApp (Success)"** y **"Send WhatsApp (Error)"**
-2. En cada uno, sección **"Credential to connect with"**
-3. Selecciona **"WhatsApp Bearer Token"** (la que acabas de crear)
-4. Click **"Save"** en el workflow (esquina superior derecha)
-
-### 5.5 Activar Workflow
-
-1. En la esquina superior derecha, el switch debe estar en **ON** (azul)
-2. Si está en OFF (gris), click para activarlo
+1. Abre http://localhost:8000/health
+2. Deberías ver: `{"status": "healthy", ...}`
+3. Abre http://localhost:8000/docs para ver la documentación interactiva
 
 ---
 
@@ -238,17 +201,7 @@ KnowLigo ofrece tres planes de servicio:
 
 ## Paso 7: Debugging (si algo falla)
 
-### 7.1 Ver Logs de n8n
-
-```powershell
-# Si usas Docker
-docker-compose logs -f n8n
-
-# Si usas npx n8n
-# Los logs aparecen en la misma terminal
-```
-
-### 7.2 Ver Logs de la API
+### 7.1 Ver Logs de la API
 
 ```powershell
 # Si usas Docker
@@ -258,26 +211,20 @@ docker-compose logs -f api
 # Los logs aparecen en la misma terminal
 ```
 
-### 7.3 Verificar Webhook Recibido
+### 7.2 Verificar Webhook Recibido
 
 1. En Meta for Developers
 2. Panel de WhatsApp → **"Webhooks"**
 3. Hay un historial de webhooks enviados
 
-### 7.4 Ver Ejecuciones en n8n
-
-1. En n8n UI, click **"Executions"**
-2. Verás todas las ejecuciones del workflow
-3. Click en una para ver detalles paso a paso
-
-### 7.5 Problemas Comunes
+### 7.3 Problemas Comunes
 
 #### ❌ Webhook no verifica
 
-**Causa**: n8n no está corriendo o la URL de ngrok cambió
+**Causa**: La API no está corriendo o la URL de ngrok cambió
 
 **Solución**:
-1. Verifica que n8n esté activo: http://localhost:5678
+1. Verifica que la API esté activa: http://localhost:8000/health
 2. Reinicia ngrok si la URL cambió
 3. Actualiza la URL en Meta for Developers
 
@@ -288,7 +235,7 @@ docker-compose logs -f api
 **Solución**:
 1. Verifica `WHATSAPP_TOKEN` en `.env`
 2. Verifica que tu número esté registrado en Meta
-3. Revisa logs de n8n (puede mostrar error 403 de WhatsApp API)
+3. Revisa logs de la API (`docker-compose logs -f api`)
 
 #### ❌ La API responde lento
 
@@ -298,7 +245,7 @@ docker-compose logs -f api
 
 #### ❌ Error "Rate limit exceeded"
 
-**Causa**: Más de 10 mensajes en 1 hora del mismo usuario
+**Causa**: Más de 15 mensajes en 1 hora del mismo usuario
 
 **Solución**: Espera 1 hora o cambia `MAX_QUERIES_PER_HOUR` en `.env`
 
@@ -332,14 +279,11 @@ Reemplaza el token temporal con el token de System User (Paso 1.4).
 
 | Item | Valor | Dónde se usa |
 |------|-------|--------------|
-| n8n UI | http://localhost:5678 | Navegador |
 | API Docs | http://localhost:8000/docs | Navegador |
-| Webhook URL | https://XXX.ngrok-free.app/webhook/whatsapp-webhook | Meta Developers |
-| n8n User | `admin` | Login n8n |
-| n8n Password | `knowligo2026` | Login n8n |
-| Verify Token | `knowligo_webhook_verify_token` | .env + Meta |
+| Webhook URL | https://XXX.ngrok-free.app/webhook | Meta Developers |
+| Verify Token | `knowligo_webhook_2026` | .env + Meta |
 | Phone Number ID | (de Meta) | .env |
-| Access Token | (de Meta) | .env + n8n credential |
+| Access Token | (de Meta) | .env |
 
 ---
 
@@ -356,10 +300,7 @@ Reemplaza el token temporal con el token de System User (Paso 1.4).
 [ ] Webhook configurado en Meta
 [ ] Webhook verificado ✅ en Meta
 [ ] Eventos "messages" suscritos
-[ ] Docker Compose corriendo (o API + n8n por separado)
-[ ] Credencial "WhatsApp Bearer Token" creada en n8n
-[ ] Workflow importado en n8n
-[ ] Workflow activado (ON)
+[ ] API corriendo (Docker o Python directo)
 [ ] Tu número agregado a lista de prueba en Meta
 [ ] Mensaje de prueba enviado
 [ ] Respuesta recibida ✅
@@ -373,11 +314,11 @@ Una vez que todos los checks estén ✅, puedes grabar tu video mostrando:
 
 1. ✅ Arquitectura del sistema (diagrama)
 2. ✅ API funcionando (Swagger UI)
-3. ✅ Workflow de n8n (mostrar nodos)
-4. ✅ **Demo en vivo**: Enviar mensaje a WhatsApp y recibir respuesta
+3. ✅ **Demo en vivo**: Enviar mensaje a WhatsApp y recibir respuesta
+4. ✅ Tests con pytest (`python -m pytest tests/ -v`)
 5. ✅ Mostrar logs/analytics en tiempo real
 6. ✅ Código del RAG pipeline (explicar componentes)
 
 ---
 
-**¿Tienes dudas?** Revisa esta guía paso a paso o consulta los logs de n8n/API para debugging.
+**¿Tienes dudas?** Revisa esta guía paso a paso o consulta los logs de la API para debugging.

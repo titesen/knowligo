@@ -45,7 +45,7 @@ Write-Host "   Selecciona una opción:" -ForegroundColor Cyan
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host "1. Iniciar API (desarrollo local)" -ForegroundColor White
 Write-Host "2. Ejecutar tests automáticos" -ForegroundColor White
-Write-Host "3. Iniciar con Docker (API + n8n)" -ForegroundColor White
+Write-Host "3. Iniciar con Docker" -ForegroundColor White
 Write-Host "4. Ver documentación API (Swagger)" -ForegroundColor White
 Write-Host "5. Salir`n" -ForegroundColor White
 
@@ -67,7 +67,6 @@ switch ($opcion) {
     "3" {
         Write-Host "`n🐳 Iniciando servicios con Docker..." -ForegroundColor Green
         Write-Host "   API: http://localhost:8000" -ForegroundColor Cyan
-        Write-Host "   n8n: http://localhost:5678 (admin/knowligo2026)" -ForegroundColor Cyan
         Write-Host "`n   Presiona CTRL+C y luego ejecuta 'docker-compose down' para detener`n" -ForegroundColor Yellow
         docker-compose up
     }
