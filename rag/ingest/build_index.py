@@ -19,9 +19,17 @@ import numpy as np
 try:
     from sentence_transformers import SentenceTransformer
     import faiss
+    from dotenv import load_dotenv
 except ImportError:
     print("⚠️  Dependencias no instaladas. Ejecuta: pip install -r requirements.txt")
     exit(1)
+
+# Cargar .env desde la raíz del proyecto
+_script_dir = Path(__file__).resolve().parent
+_project_root = _script_dir.parent.parent
+_env_path = _project_root / ".env"
+if _env_path.exists():
+    load_dotenv(_env_path)
 
 from chunker import process_documents
 
@@ -32,16 +40,22 @@ except ImportError:
     generate_db_docs = None
 
 
+# Modelo multilingüe por defecto (soporta español, inglés, y 50+ idiomas)
+DEFAULT_EMBEDDING_MODEL = "paraphrase-multilingual-MiniLM-L12-v2"
+
+
 class IndexBuilder:
     """Clase para construir y guardar el índice FAISS"""
 
-    def __init__(self, model_name: str = "all-MiniLM-L6-v2"):
+    def __init__(self, model_name: str = None):
         """
         Inicializa el builder con el modelo de embeddings.
 
         Args:
-            model_name: Nombre del modelo de sentence-transformers
+            model_name: Nombre del modelo de sentence-transformers (lee de EMBEDDING_MODEL env var)
         """
+        if model_name is None:
+            model_name = os.getenv("EMBEDDING_MODEL", DEFAULT_EMBEDDING_MODEL)
         print(f"📥 Cargando modelo de embeddings: {model_name}")
         self.model = SentenceTransformer(model_name)
         self.model_name = model_name
@@ -149,7 +163,7 @@ class IndexBuilder:
 
 
 def build_knowledge_base(
-    chunk_size: int = 500, overlap: int = 50, model_name: str = "all-MiniLM-L6-v2"
+    chunk_size: int = 500, overlap: int = 50, model_name: str = None
 ):
     """
     Función principal para construir la base de conocimiento completa.
@@ -237,6 +251,6 @@ if __name__ == "__main__":
     # Permitir pasar parámetros desde línea de comandos
     chunk_size = int(sys.argv[1]) if len(sys.argv) > 1 else 500
     overlap = int(sys.argv[2]) if len(sys.argv) > 2 else 50
-    model = sys.argv[3] if len(sys.argv) > 3 else "all-MiniLM-L6-v2"
+    model = sys.argv[3] if len(sys.argv) > 3 else None
 
     build_knowledge_base(chunk_size=chunk_size, overlap=overlap, model_name=model)

@@ -18,6 +18,8 @@ from dotenv import load_dotenv
 # Importar componentes del RAG
 from .validator import QueryValidator
 from .retriever import FAISSRetriever
+from .reranker import CrossEncoderReranker
+from .cache import SemanticCache
 from .responder import GroqResponder
 from .intent import IntentClassifier
 
@@ -50,8 +52,10 @@ class RAGPipeline:
             os.getenv("MAX_QUERIES_PER_HOUR", "15")
         )
 
-        # Retrieval config
-        self.top_k = int(os.getenv("TOP_K_RETRIEVAL", "5"))
+        # Retrieval config (más candidatos para reranking)
+        self.top_k = int(os.getenv("TOP_K_RETRIEVAL", "15"))
+        self.rerank_enabled = os.getenv("RERANK_ENABLED", "true").lower() == "true"
+        self.cache_enabled = os.getenv("CACHE_ENABLED", "true").lower() == "true"
 
         # Inicializar componentes
         print("🚀 Inicializando RAG Pipeline...")
@@ -68,6 +72,20 @@ class RAGPipeline:
 
             self.intent_classifier = IntentClassifier()
             print("✅ Intent Classifier cargado")
+
+            if self.rerank_enabled:
+                self.reranker = CrossEncoderReranker()
+                print("✅ Reranker cargado")
+            else:
+                self.reranker = None
+                print("ℹ️  Reranker deshabilitado")
+
+            if self.cache_enabled:
+                self.cache = SemanticCache(model=self.retriever.model)
+                print("✅ Cache semántico cargado")
+            else:
+                self.cache = None
+                print("ℹ️  Cache semántico deshabilitado")
 
             # Inicializar tabla de logs si no existe
             self._init_query_logs_table()
@@ -113,7 +131,36 @@ class RAGPipeline:
                     "intent": "unknown",
                 }
 
-            # 2. Validar query
+            # 2. Cache semántico - buscar respuesta cacheada
+            if self.cache:
+                cached = self.cache.lookup(user_query)
+                if cached:
+                    processing_time = (datetime.now() - start_time).total_seconds()
+                    print(
+                        f"⚡ Cache HIT (score={cached['cache_score']:.3f}) "
+                        f"en {processing_time:.3f}s"
+                    )
+
+                    self._log_query(
+                        user_id=user_id,
+                        query=user_query,
+                        intent=cached["intent"],
+                        response=cached["response"],
+                        success=True,
+                        processing_time=processing_time,
+                    )
+
+                    return {
+                        "success": True,
+                        "response": cached["response"],
+                        "intent": cached["intent"],
+                        "sources": cached["sources"],
+                        "processing_time": processing_time,
+                        "cached": True,
+                        "cache_score": cached["cache_score"],
+                    }
+
+            # 3. Validar query
             is_valid, validation_reason = self.validator.is_valid_query(user_query)
 
             if not is_valid:
@@ -134,7 +181,7 @@ class RAGPipeline:
                     "intent": "rejected",
                 }
 
-            # 3. Clasificar intención
+            # 4. Clasificar intención
             intent_result = self.intent_classifier.classify(user_query)
             intent = intent_result["intent"].value
 
@@ -142,13 +189,19 @@ class RAGPipeline:
                 f"🎯 Intent: {intent} (confidence: {intent_result['confidence']:.2f})"
             )
 
-            # 4. Recuperar contexto relevante
+            # 5. Recuperar contexto relevante
             print(f"🔍 Buscando contexto para: '{user_query[:50]}...'")
             retrieved_chunks = self.retriever.retrieve(user_query, top_k=self.top_k)
 
             print(f"📚 Recuperados {len(retrieved_chunks)} chunks")
 
-            # 5. Generar respuesta con LLM
+            # 6. Reranking (si está habilitado)
+            if self.reranker and retrieved_chunks:
+                print(f"🔄 Reranking {len(retrieved_chunks)} chunks...")
+                retrieved_chunks = self.reranker.rerank(user_query, retrieved_chunks)
+                print(f"✅ Reranked: top {len(retrieved_chunks)} chunks seleccionados")
+
+            # 7. Generar respuesta con LLM
             print(f"🤖 Generando respuesta...")
             response_result = self.responder.generate_response(
                 query=user_query,
@@ -159,7 +212,7 @@ class RAGPipeline:
             response_text = response_result["response"]
             tokens_used = response_result.get("tokens_used", 0)
 
-            # 6. Extraer fuentes
+            # 8. Extraer fuentes
             sources = [
                 {
                     "file": chunk["metadata"].get("source", "unknown"),
@@ -169,7 +222,7 @@ class RAGPipeline:
                 for chunk in retrieved_chunks
             ]
 
-            # 7. Registrar query exitosa
+            # 9. Registrar query exitosa
             processing_time = (datetime.now() - start_time).total_seconds()
 
             self._log_query(
@@ -181,6 +234,15 @@ class RAGPipeline:
                 tokens_used=tokens_used,
                 processing_time=processing_time,
             )
+
+            # 10. Guardar en cache para futuras consultas similares
+            if self.cache:
+                self.cache.store(
+                    query=user_query,
+                    response=response_text,
+                    intent=intent,
+                    sources=sources,
+                )
 
             print(f"✅ Query procesada en {processing_time:.2f}s\n")
 

@@ -1,0 +1,92 @@
+[
+  {
+    "question": "¿Qué planes de soporte ofrece KnowLigo?",
+    "ground_truth": "KnowLigo ofrece tres planes de soporte: Plan Básico ($299/mes) para hasta 10 usuarios con soporte en horario laboral, Plan Profesional ($599/mes) para hasta 50 usuarios con soporte extendido y monitoreo, y Plan Empresarial ($999/mes) para usuarios ilimitados con soporte 24/7 y gerente dedicado.",
+    "intent": "planes"
+  },
+  {
+    "question": "¿Cuál es el tiempo de respuesta para tickets críticos?",
+    "ground_truth": "Para tickets de prioridad crítica, el SLA establece un tiempo de primera respuesta de 15 minutos y un tiempo objetivo de resolución de 4 horas, con disponibilidad 24/7.",
+    "intent": "sla"
+  },
+  {
+    "question": "¿Qué incluye el plan profesional?",
+    "ground_truth": "El Plan Profesional ($599/mes) incluye soporte para hasta 50 usuarios, horario extendido de lunes a sábado 7am-10pm, soporte remoto y presencial, monitoreo proactivo, mantenimiento mensual, backup semanal y 20 horas mensuales de consultoría.",
+    "intent": "planes"
+  },
+  {
+    "question": "¿Cómo puedo reportar un incidente?",
+    "ground_truth": "Para reportar un incidente puede contactar a KnowLigo a través de: email a soporte@knowligo.com, teléfono al +54 11 5555-0100, el portal de clientes, o por WhatsApp. Al crear un ticket se le asigna un número de referencia y se clasifica según prioridad.",
+    "intent": "tickets"
+  },
+  {
+    "question": "¿Qué es KnowLigo?",
+    "ground_truth": "KnowLigo es una empresa argentina de servicios de soporte técnico IT con más de 10 años de experiencia, fundada en 2014 en Buenos Aires. Ofrece soporte remoto y presencial, mantenimiento preventivo, gestión de backups, seguridad informática y consultoría tecnológica.",
+    "intent": "info_general"
+  },
+  {
+    "question": "¿Cuál es la política de privacidad de datos?",
+    "ground_truth": "KnowLigo cumple con la Ley de Protección de Datos Personales N° 25.326 de Argentina. Firmamos acuerdos de confidencialidad (NDA), todos los empleados están capacitados en manejo de información sensible, y los datos se almacenan en centros certificados ISO 27001.",
+    "intent": "faq"
+  },
+  {
+    "question": "¿Hacen mantenimiento preventivo?",
+    "ground_truth": "Sí, KnowLigo realiza mantenimiento preventivo que incluye actualización de software y parches de seguridad, limpieza de sistemas y optimización, verificación de backups, revisión de logs y métricas de rendimiento, y auditoría de seguridad básica. La frecuencia depende del plan contratado.",
+    "intent": "mantenimiento"
+  },
+  {
+    "question": "¿Qué pasa si no resuelven un ticket a tiempo?",
+    "ground_truth": "Si no se cumple el SLA, KnowLigo aplica compensaciones automáticas: se escala la prioridad del ticket, se asigna personal adicional, y dependiendo del caso puede aplicar créditos por incumplimiento según lo establecido en el contrato del plan.",
+    "intent": "sla"
+  },
+  {
+    "question": "¿Cuánto cuesta el plan básico?",
+    "ground_truth": "El Plan Básico de KnowLigo tiene un costo de $299 USD por mes. Incluye soporte para hasta 10 usuarios, horario laboral de lunes a viernes 9am-6pm, soporte remoto, mantenimiento trimestral y 5 horas mensuales de consultoría.",
+    "intent": "planes"
+  },
+  {
+    "question": "¿Tienen servicio de backup?",
+    "ground_truth": "Sí, KnowLigo ofrece servicios de backup y recuperación que incluyen backup diario automatizado, almacenamiento local y en la nube, plan de recuperación ante desastres (DRP), y pruebas periódicas de restauración. La frecuencia de backup varía según el plan contratado.",
+    "intent": "faq"
+  },
+  {
+    "question": "¿Dónde están ubicados?",
+    "ground_truth": "KnowLigo tiene su oficina principal en Buenos Aires, Argentina, en Av. Corrientes 1234, Piso 8, CABA (C1043AAZ). Su horario de atención general es de lunes a viernes de 9:00 a 18:00 horas.",
+    "intent": "info_general"
+  },
+  {
+    "question": "¿Qué diferencia hay entre el plan profesional y el empresarial?",
+    "ground_truth": "Las principales diferencias son: el Plan Profesional ($599/mes) soporta hasta 50 usuarios con horario extendido L-S 7am-10pm, mientras que el Empresarial ($999/mes) tiene usuarios ilimitados con soporte 24/7. El Empresarial incluye además un gerente de cuenta dedicado, monitoreo 24/7, mantenimiento semanal, backup diario y horas ilimitadas de consultoría.",
+    "intent": "planes"
+  },
+  {
+    "question": "¿Qué servicios de seguridad ofrecen?",
+    "ground_truth": "KnowLigo ofrece servicios de seguridad informática que incluyen implementación y gestión de antivirus/antimalware, configuración de firewalls, certificados SSL, VPN corporativas, auditorías de seguridad, y protección contra ransomware y amenazas avanzadas.",
+    "intent": "faq"
+  },
+  {
+    "question": "¿Cuál es el horario de soporte del plan empresarial?",
+    "ground_truth": "El Plan Empresarial ofrece soporte 24/7, es decir, las 24 horas del día, los 7 días de la semana, incluyendo fines de semana y feriados.",
+    "intent": "sla"
+  },
+  {
+    "question": "¿Cómo funciona la escalación de tickets?",
+    "ground_truth": "La escalación de tickets en KnowLigo sigue un proceso definido: tickets de prioridad baja son atendidos por soporte nivel 1, los de prioridad media por nivel 2, alta por nivel 2 con supervisión, y los críticos se escalan directamente a nivel 3 con respuesta inmediata. Si un ticket no se resuelve en el tiempo del SLA, se escala automáticamente.",
+    "intent": "tickets"
+  },
+  {
+    "question": "¿Qué exclusiones tienen los servicios?",
+    "ground_truth": "Las exclusiones de servicio incluyen: daños por mal uso o negligencia del cliente, problemas con software no licenciado o no autorizado, hardware obsoleto sin soporte del fabricante, fallas por desastres naturales no cubiertos, y modificaciones no autorizadas en infraestructura.",
+    "intent": "faq"
+  },
+  {
+    "question": "¿Puedo cancelar mi plan?",
+    "ground_truth": "Sí, los planes pueden cancelarse con un aviso previo según los términos del contrato. Se requiere notificación por escrito y se aplican las condiciones de cancelación establecidas en la política comercial de KnowLigo.",
+    "intent": "faq"
+  },
+  {
+    "question": "¿Qué monitoreo incluye el plan profesional?",
+    "ground_truth": "El Plan Profesional incluye monitoreo proactivo de infraestructura que abarca disponibilidad de servidores y servicios, uso de recursos (CPU, memoria, disco), estado de backups, y alertas automáticas ante anomalías.",
+    "intent": "planes"
+  }
+]

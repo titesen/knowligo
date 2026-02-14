@@ -2,14 +2,60 @@
 Validator - Valida que las consultas estén dentro del dominio permitido.
 
 Este módulo:
-1. Carga topics permitidos y prohibidos desde metadata
-2. Valida si una query es relevante al negocio
-3. Rechaza queries fuera de tópico o inapropiadas
+1. Detecta intentos de prompt injection
+2. Carga topics permitidos y prohibidos desde metadata
+3. Valida si una query es relevante al negocio
+4. Rechaza queries fuera de tópico o inapropiadas
 """
 
+import re
 import json
 from pathlib import Path
 from typing import Tuple
+
+
+# ============================================================================
+# Patrones de Prompt Injection
+# Detecta intentos de manipular el sistema vía instrucciones maliciosas.
+# Incluye patrones en español e inglés para cobertura completa.
+# ============================================================================
+INJECTION_PATTERNS = [
+    # Intentos de override de instrucciones
+    r"ignor[ae]\s+(todas?\s+las?\s+)?instrucciones",
+    r"ignore\s+(all\s+)?(previous\s+)?instructions",
+    r"olvida\s+(todas?\s+las?\s+)?instrucciones",
+    r"forget\s+(all\s+)?(previous\s+)?instructions",
+    r"descarta\s+(el\s+)?prompt\s+anterior",
+    r"override\s+(system|prompt|instructions)",
+    # Intentos de cambiar el rol del sistema
+    r"ahora\s+(eres|act[uú]a\s+como|pretende\s+ser)",
+    r"(you\s+are\s+now|act\s+as|pretend\s+(to\s+be|you\s+are))",
+    r"nuevo\s+rol|new\s+role|cambia\s+(tu\s+)?rol",
+    r"eres\s+un\s+(hacker|asistente\s+sin\s+restricciones)",
+    # DAN / jailbreak comunes
+    r"\bdan\s+mode\b",
+    r"\bjailbreak\b",
+    r"modo\s+sin\s+(restricciones|l[ií]mites|filtros)",
+    r"sin\s+restricciones",
+    r"do\s+anything\s+now",
+    # Intentos de extraer prompt del sistema
+    r"(muestra|dime|revela|comparte|repite)\s+(el|tu|the)\s+(prompt|system|instrucciones)",
+    r"(show|reveal|print|repeat|display)\s+(your\s+)?(system\s+)?(prompt|instructions)",
+    r"cu[aá]l\s+es\s+tu\s+(prompt|instrucciones\s+del\s+sistema)",
+    r"what\s+(is|are)\s+your\s+(system\s+)?(prompt|instructions)",
+    # Inyección de delimitadores / tokens especiales
+    r"<\|?(system|im_start|im_end|endoftext)\|?>",
+    r"\[INST\]|\[/INST\]|\[SYSTEM\]",
+    r"###\s*(system|instruction|human|assistant)",
+    # Encoding/obfuscation attempts
+    r"base64|rot13|hex\s+encode|unicode\s+escape",
+    r"codifica|decodifica|encripta",
+]
+
+# Pre-compilar patrones para rendimiento
+_COMPILED_INJECTION_PATTERNS = [
+    re.compile(pattern, re.IGNORECASE) for pattern in INJECTION_PATTERNS
+]
 
 
 class QueryValidator:
@@ -57,7 +103,16 @@ class QueryValidator:
         if not query.strip():
             return False, "La consulta está vacía"
 
-        # 2. Verificar que no contenga topics prohibidos (coincidencia de frase completa)
+        # 2. Detectar prompt injection
+        injection_detected = self._check_prompt_injection(query_lower)
+        if injection_detected:
+            return (
+                False,
+                "Lo siento, no puedo procesar esa consulta. "
+                "¿Puedo ayudarte con información sobre los servicios de KnowLigo?",
+            )
+
+        # 3. Verificar que no contenga topics prohibidos (coincidencia de frase completa)
         for forbidden in self.forbidden_topics:
             forbidden_lower = forbidden.lower()
             if forbidden_lower in query_lower:
@@ -67,7 +122,7 @@ class QueryValidator:
                     f"Me especializo en {self.domain}.",
                 )
 
-        # 3. Verificar que contenga algún topic permitido
+        # 4. Verificar que contenga algún topic permitido
         # Keywords relacionados a cada topic permitido
         topic_keywords = {
             "support": [
@@ -243,8 +298,27 @@ class QueryValidator:
                 f"mantenimiento, backup, políticas y facturación.",
             )
 
-        # 4. Query es válida
+        # 5. Query es válida
         return True, ""
+
+    def _check_prompt_injection(self, query_lower: str) -> bool:
+        """
+        Detecta intentos de prompt injection en la query.
+
+        Usa patrones regex pre-compilados para detectar técnicas comunes
+        de inyección en español e inglés.
+
+        Args:
+            query_lower: Query en minúsculas
+
+        Returns:
+            True si se detectó inyección, False si es segura
+        """
+        for pattern in _COMPILED_INJECTION_PATTERNS:
+            if pattern.search(query_lower):
+                print(f"⚠️  Prompt injection detectado: patrón '{pattern.pattern}'")
+                return True
+        return False
 
 
 # Funciones de conveniencia

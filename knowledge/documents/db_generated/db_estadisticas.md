@@ -1,6 +1,6 @@
 # Estadísticas Operativas de KnowLigo
 
-Datos actualizados al 13/02/2026.
+Datos actualizados al 14/02/2026.
 
 ## Clientes
 

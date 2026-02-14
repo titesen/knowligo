@@ -8,11 +8,13 @@ Este módulo:
 4. Retorna contexto relevante para el LLM
 """
 
+import os
 import json
 import pickle
 from pathlib import Path
 from typing import List, Dict, Tuple
 import numpy as np
+from dotenv import load_dotenv
 
 try:
     from sentence_transformers import SentenceTransformer
@@ -22,6 +24,10 @@ except ImportError:
     exit(1)
 
 
+# Modelo multilingüe por defecto (soporta español, inglés, y 50+ idiomas)
+DEFAULT_EMBEDDING_MODEL = "paraphrase-multilingual-MiniLM-L12-v2"
+
+
 class FAISSRetriever:
     """Recupera chunks relevantes usando búsqueda vectorial FAISS"""
 
@@ -29,7 +35,7 @@ class FAISSRetriever:
         self,
         index_path: str = None,
         metadata_path: str = None,
-        model_name: str = "all-MiniLM-L6-v2",
+        model_name: str = None,
     ):
         """
         Inicializa el retriever con índice FAISS y modelo de embeddings.
@@ -37,12 +43,21 @@ class FAISSRetriever:
         Args:
             index_path: Ruta al archivo .index de FAISS
             metadata_path: Ruta al JSON con metadata de chunks
-            model_name: Modelo de sentence-transformers para embeddings
+            model_name: Modelo de sentence-transformers para embeddings (lee de EMBEDDING_MODEL env var)
         """
+        # Cargar .env
+        script_dir = Path(__file__).resolve().parent
+        project_root = script_dir.parent.parent
+        env_path = project_root / ".env"
+        if env_path.exists():
+            load_dotenv(env_path)
+
+        # Modelo de embeddings: parámetro > env > default multilingüe
+        if model_name is None:
+            model_name = os.getenv("EMBEDDING_MODEL", DEFAULT_EMBEDDING_MODEL)
+
         # Rutas por defecto
         if index_path is None or metadata_path is None:
-            script_dir = Path(__file__).resolve().parent
-            project_root = script_dir.parent.parent
             store_dir = project_root / "rag" / "store"
 
             if index_path is None:
