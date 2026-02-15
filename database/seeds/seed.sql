@@ -18,7 +18,7 @@ INSERT INTO clients (name, industry, contact_name, contact_email, contact_phone,
 ('Constructora Vial',      'Construcción',     'Jorge Domínguez',   'jdominguez@vialsa.com.ar',        '+54 11 4321-0007', '541143210007', 95,  '2025-01-10'),
 ('Farmacia Central',       'Salud',            'María Torres',      'mtorres@farmaciacentral.com.ar',  '+54 11 4321-0008', '541143210008', 25,  '2025-01-20'),
 ('Demo Facundo',           'Tecnología',       'Facundo',           'facundo@demo.com.ar',             '+54 9 3794 28-5297', '5493794285297', 10, '2025-02-01'),
-('Demo Contacto',          'Consultoría',      'Contacto Test',     'contacto@demo.com.ar',            '+54 9 3794 10-3485', '5493794103485', 5,  '2025-02-01');
+('Demo Contacto',          'Consultoría',      'Contacto Test',     'contacto@demo.com.ar',            '+54 9 3794 11-3485', '5493794113485', 5,  '2025-02-01');
 
 -- CONTRATOS
 INSERT INTO contracts (client_id, plan_id, start_date, end_date, status, monthly_amount, notes) VALUES
