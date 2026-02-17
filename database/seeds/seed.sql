@@ -11,7 +11,7 @@ INSERT INTO plans (name, description, price_ars, max_tickets_month, support_hour
 INSERT INTO clients (name, industry, contact_name, contact_email, contact_phone, phone, employee_count, created_at) VALUES
 ('Acme Corp',              'Manufactura',     'Carlos Méndez',     'carlos.mendez@acme.com.ar',       '+54 11 4321-0001', '541143210001', 120, '2024-08-15'),
 ('Beta Solutions',         'Tecnología',       'Laura Fernández',   'laura@betasolutions.com.ar',      '+54 11 4321-0002', '541143210002', 45,  '2024-09-01'),
-('Distribuidora del Sur',  'Logística',        'Martín Rodríguez',  'mrodriguez@delsur.com.ar',        '+54 11 4321-0003', '541143210003', 80,  '2024-10-10'),
+('Distribuidora del Sur',  'Logística',        'Marttín Rodríguez',  'mrodriguez@delsur.com.ar',        '+54 11 4321-0003', '541143210003', 80,  '2024-10-10'),
 ('Estudio Contable Ríos',  'Servicios prof.', 'Ana Ríos',          'arios@estudiorios.com.ar',         '+54 11 4321-0004', '541143210004', 15,  '2024-11-01'),
 ('Clínica San Martín',     'Salud',            'Dr. Pablo Herrera', 'pherrera@clinicasanmartin.com.ar', '+54 11 4321-0005', '541143210005', 200, '2024-11-20'),
 ('Hotel Palermo',          'Hotelería',        'Sofía López',       'slopez@hotelpalermo.com.ar',      '+54 11 4321-0006', '541143210006', 60,  '2024-12-05'),
