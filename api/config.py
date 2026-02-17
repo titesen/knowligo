@@ -50,8 +50,9 @@ class Settings(BaseSettings):
 
     # Retrieval
     TOP_K_RETRIEVAL: int = 15
-    MAX_QUERIES_PER_HOUR: int = 15
-    MAX_MESSAGE_LENGTH: int = 150
+    MAX_QUERIES_PER_HOUR: int = 30
+    MAX_MESSAGE_LENGTH: int = 300
+    QUERY_REWRITE_ENABLED: bool = True
 
     # WhatsApp
     WHATSAPP_TOKEN: Optional[str] = None

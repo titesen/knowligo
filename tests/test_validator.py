@@ -43,6 +43,21 @@ class TestValidQueries:
         is_valid, reason = validator.is_valid_query("¿Cómo abro un ticket de soporte?")
         assert is_valid is True
 
+    def test_query_sin_keywords_pasa(self, validator):
+        """Queries sin keywords del viejo allowlist ahora pasan (no hay keyword gating)."""
+        is_valid, reason = validator.is_valid_query("que sistemas operativos soportan")
+        assert is_valid is True
+
+    def test_query_ambigua_pasa(self, validator):
+        """Queries ambiguas ya no se rechazan."""
+        is_valid, reason = validator.is_valid_query("cómo funciona esto")
+        assert is_valid is True
+
+    def test_query_casual_pasa(self, validator):
+        """Preguntas casuales pasan al LLM router para filtrado."""
+        is_valid, reason = validator.is_valid_query("tienen algo para mi empresa?")
+        assert is_valid is True
+
 
 # Queries vacías / inválidas
 

@@ -1,11 +1,10 @@
 """
-Retriever - Recupera chunks relevantes del índice FAISS.
+Retriever - Recupera chunks relevantes usando búsqueda vectorial y léxica.
 
 Este módulo:
-1. Carga el índice FAISS y metadata de chunks
-2. Genera embeddings para queries
-3. Busca los chunks más similares
-4. Retorna contexto relevante para el LLM
+1. FAISSRetriever: búsqueda densa (embeddings) con FAISS
+2. HybridRetriever: combina FAISS (denso) + BM25 (léxico) con RRF fusion
+3. Retorna contexto relevante para el LLM
 """
 
 import json
@@ -21,6 +20,11 @@ try:
 except ImportError:
     print("⚠️  Dependencias no instaladas. Ejecuta: pip install -r requirements.txt")
     exit(1)
+
+try:
+    from rank_bm25 import BM25Okapi
+except ImportError:
+    BM25Okapi = None  # graceful degradation — hybrid falls back to dense-only
 
 
 # Modelo multilingüe por defecto (soporta español, inglés, y 50+ idiomas)
@@ -175,3 +179,161 @@ class FAISSRetriever:
                 context_parts.append(f"[{source}]\n{text}")
 
         return "\n\n".join(context_parts)
+
+
+# Tokenización simple para BM25
+
+
+def _tokenize_es(text: str) -> list[str]:
+    """Tokenización simple para español — lowercase + split en no-alfanuméricos."""
+    import re
+
+    return re.findall(r"[a-záéíóúüñ0-9]+", text.lower())
+
+
+# HybridRetriever  — Dense (FAISS) + Sparse (BM25) con RRF fusion
+
+
+class HybridRetriever:
+    """Combina FAISSRetriever (denso) con BM25 (léxico) usando Reciprocal Rank Fusion.
+
+    Si ``rank_bm25`` no está instalado, funciona como proxy de FAISSRetriever.
+    """
+
+    def __init__(
+        self,
+        index_path: str = None,
+        metadata_path: str = None,
+        model_name: str = None,
+        rrf_k: int = 60,
+    ):
+        # Inicializar retriever denso
+        self.dense = FAISSRetriever(
+            index_path=index_path,
+            metadata_path=metadata_path,
+            model_name=model_name,
+        )
+
+        # Exponer atributos que el pipeline usa
+        self.model = self.dense.model
+        self.model_name = self.dense.model_name
+        self.chunks = self.dense.chunks
+
+        self.rrf_k = rrf_k
+
+        # Construir índice BM25 sobre los textos de los chunks
+        if BM25Okapi is not None:
+            corpus = [_tokenize_es(c.get("text", "")) for c in self.chunks]
+            self.bm25 = BM25Okapi(corpus)
+            logger.info(f"BM25 index construido ({len(corpus)} documentos)")
+        else:
+            self.bm25 = None
+            logger.warning(
+                "rank_bm25 no instalado — HybridRetriever opera solo en modo denso. "
+                "Instalá con: pip install rank_bm25"
+            )
+
+    # retrieve
+
+    def retrieve(
+        self,
+        query: str,
+        top_k: int = 3,
+        score_threshold: float = None,
+        dense_query: str | None = None,
+    ) -> List[Dict]:
+        """Recupera chunks combinando FAISS + BM25.
+
+        Args:
+            query: Consulta original del usuario (se usa para BM25).
+            top_k: Cantidad final de chunks a devolver.
+            score_threshold: Umbral opcional para resultados densos.
+            dense_query: Si se provee, se usa como query para la búsqueda densa
+                (útil cuando hay query-rewriting / HyDE).
+        """
+        # Query para la búsqueda densa (podría ser la reescritura)
+        dq = dense_query or query
+
+        # Búsqueda densa — pedimos el doble de candidatos para RRF
+        dense_results = self.dense.retrieve(
+            dq, top_k=top_k * 2, score_threshold=score_threshold
+        )
+
+        if self.bm25 is None:
+            # Sin BM25 → devolver solo denso, truncado a top_k
+            return dense_results[:top_k]
+
+        # Búsqueda BM25
+        tokenized_query = _tokenize_es(query)
+        bm25_scores = self.bm25.get_scores(tokenized_query)
+        bm25_top_indices = np.argsort(bm25_scores)[::-1][: top_k * 2]
+
+        bm25_results = []
+        for rank, idx in enumerate(bm25_top_indices):
+            idx = int(idx)
+            if bm25_scores[idx] <= 0:
+                break
+            chunk = self.chunks[idx]
+            bm25_results.append(
+                {
+                    "text": chunk.get("text", ""),
+                    "metadata": chunk.get("metadata", {}),
+                    "score": float(bm25_scores[idx]),
+                    "rank": rank + 1,
+                    "_idx": idx,
+                }
+            )
+
+        # Mapear dense_results a _idx para RRF
+        # (no tenemos _idx nativo, así que buscamos por texto)
+        dense_text_to_rank: dict[str, int] = {}
+        for r in dense_results:
+            dense_text_to_rank[r["text"]] = r["rank"]
+
+        bm25_text_to_rank: dict[str, int] = {}
+        for r in bm25_results:
+            bm25_text_to_rank[r["text"]] = r["rank"]
+
+        # Unión de todos los textos vistos
+        all_texts = set(dense_text_to_rank.keys()) | set(bm25_text_to_rank.keys())
+
+        # RRF fusion
+        k = self.rrf_k
+        scored: list[tuple[str, float]] = []
+        for text in all_texts:
+            rrf_score = 0.0
+            if text in dense_text_to_rank:
+                rrf_score += 1.0 / (k + dense_text_to_rank[text])
+            if text in bm25_text_to_rank:
+                rrf_score += 1.0 / (k + bm25_text_to_rank[text])
+            scored.append((text, rrf_score))
+
+        scored.sort(key=lambda x: x[1], reverse=True)
+
+        # Construir resultados finales
+        # Lookup rápido de metadata
+        text_to_meta: dict[str, dict] = {}
+        for r in dense_results + bm25_results:
+            if r["text"] not in text_to_meta:
+                text_to_meta[r["text"]] = r["metadata"]
+
+        final: list[dict] = []
+        for rank, (text, rrf_score) in enumerate(scored[:top_k], 1):
+            final.append(
+                {
+                    "text": text,
+                    "metadata": text_to_meta.get(text, {}),
+                    "score": rrf_score,
+                    "rank": rank,
+                }
+            )
+
+        logger.info(
+            f"Hybrid retrieve: {len(dense_results)} dense + "
+            f"{len(bm25_results)} BM25 → {len(final)} RRF-fused"
+        )
+        return final
+
+    def format_context(self, results: List[Dict]) -> str:
+        """Proxy a FAISSRetriever.format_context."""
+        return self.dense.format_context(results)

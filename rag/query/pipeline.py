@@ -16,7 +16,7 @@ from typing import Dict, Optional
 
 # Importar componentes del RAG
 from .validator import QueryValidator
-from .retriever import FAISSRetriever
+from .retriever import FAISSRetriever, HybridRetriever
 from .reranker import CrossEncoderReranker
 from .cache import SemanticCache
 from .responder import GroqResponder
@@ -69,8 +69,8 @@ class RAGPipeline:
             self.validator = QueryValidator()
             logger.info("Validator cargado")
 
-            self.retriever = FAISSRetriever(model_name=settings.EMBEDDING_MODEL)
-            logger.info("Retriever cargado")
+            self.retriever = HybridRetriever(model_name=settings.EMBEDDING_MODEL)
+            logger.info("HybridRetriever cargado (dense + BM25)")
 
             self.responder = GroqResponder(
                 api_key=settings.GROQ_API_KEY,
@@ -206,13 +206,22 @@ class RAGPipeline:
                 f"Intent: {intent} (confidence: {intent_result['confidence']:.2f})"
             )
 
-            # 5. Recuperar contexto relevante
+            # 5. Query rewriting (HyDE-lite) — mejora retrieval para queries cortas/ambiguas
+            rewritten_query = None
+            if self._settings.QUERY_REWRITE_ENABLED:
+                rewritten_query = self._rewrite_query(user_query)
+
+            # 6. Recuperar contexto relevante
             logger.info(f"Buscando contexto para: '{user_query[:50]}...'")
-            retrieved_chunks = self.retriever.retrieve(user_query, top_k=self.top_k)
+            retrieved_chunks = self.retriever.retrieve(
+                user_query,
+                top_k=self.top_k,
+                dense_query=rewritten_query,
+            )
 
             logger.info(f"Recuperados {len(retrieved_chunks)} chunks")
 
-            # 6. Reranking (si está habilitado)
+            # 7. Reranking (si está habilitado)
             if self.reranker and retrieved_chunks:
                 logger.info(f"Reranking {len(retrieved_chunks)} chunks...")
                 retrieved_chunks = self.reranker.rerank(user_query, retrieved_chunks)
@@ -220,7 +229,7 @@ class RAGPipeline:
                     f"Reranked: top {len(retrieved_chunks)} chunks seleccionados"
                 )
 
-            # 7. Generar respuesta con LLM
+            # 8. Generar respuesta con LLM
             logger.info("Generando respuesta...")
             response_result = self.responder.generate_response(
                 query=user_query,
@@ -231,7 +240,7 @@ class RAGPipeline:
             response_text = response_result["response"]
             tokens_used = response_result.get("tokens_used", 0)
 
-            # 8. Extraer fuentes
+            # 9. Extraer fuentes
             sources = [
                 {
                     "file": chunk["metadata"].get("source", "unknown"),
@@ -241,7 +250,7 @@ class RAGPipeline:
                 for chunk in retrieved_chunks
             ]
 
-            # 9. Registrar query exitosa
+            # 10. Registrar query exitosa
             processing_time = (datetime.now() - start_time).total_seconds()
 
             self._log_query(
@@ -254,7 +263,7 @@ class RAGPipeline:
                 processing_time=processing_time,
             )
 
-            # 10. Guardar en cache para futuras consultas similares
+            # 11. Guardar en cache para futuras consultas similares
             if self.cache:
                 self.cache.store(
                     query=user_query,
@@ -329,6 +338,42 @@ class RAGPipeline:
         except Exception as e:
             logger.warning(f"Error checking rate limit: {e}")
             return True  # En caso de error, permitir la query
+
+    # Query rewriting (HyDE-lite)
+
+    _REWRITE_SYSTEM = (
+        "Sos un experto en reformular consultas de usuarios para mejorar la "
+        "búsqueda en documentación de una empresa de soporte IT (KnowLigo). "
+        "Reescribí la pregunta del usuario como una afirmación informativa "
+        "que podría aparecer en documentación técnica. "
+        "Solo devolvé la oración reescrita, sin explicaciones."
+    )
+
+    def _rewrite_query(self, query: str) -> str | None:
+        """Reescribe la query en forma declarativa para mejorar embedding retrieval.
+
+        Usa un LLM call liviano (max_tokens=120). Si falla, retorna None
+        y el pipeline usa la query original para ambas búsquedas.
+        """
+        try:
+            from groq import Groq
+
+            client = Groq(api_key=self._settings.GROQ_API_KEY)
+            completion = client.chat.completions.create(
+                messages=[
+                    {"role": "system", "content": self._REWRITE_SYSTEM},
+                    {"role": "user", "content": query},
+                ],
+                model=self._settings.LLM_MODEL,
+                temperature=0.3,
+                max_tokens=120,
+            )
+            rewritten = completion.choices[0].message.content.strip()
+            logger.info(f"Query rewrite: '{query[:40]}…' → '{rewritten[:60]}…'")
+            return rewritten
+        except Exception as e:
+            logger.warning(f"Query rewrite falló, usando original: {e}")
+            return None
 
     def _log_query(
         self,

@@ -268,3 +268,31 @@ class DBService:
             )
             conn.commit()
             return cursor.rowcount
+
+    # Message history (from query_logs)
+
+    def get_recent_messages(self, phone: str, limit: int = 6) -> list[dict]:
+        """Obtiene los últimos mensajes usuario/asistente desde query_logs.
+
+        Returns:
+            Lista de dicts con 'role' y 'content', ordenados cronológicamente
+            (más viejo primero). Formato compatible con OpenAI messages.
+        """
+        with self._conn() as conn:
+            rows = conn.execute(
+                """
+                SELECT query, response FROM query_logs
+                WHERE user_id = ? AND success = 1
+                ORDER BY timestamp DESC
+                LIMIT ?
+                """,
+                (phone, limit),
+            ).fetchall()
+
+        # rows vienen DESC; invertir para orden cronológico
+        messages: list[dict] = []
+        for row in reversed(rows):
+            messages.append({"role": "user", "content": row["query"]})
+            if row["response"]:
+                messages.append({"role": "assistant", "content": row["response"]})
+        return messages

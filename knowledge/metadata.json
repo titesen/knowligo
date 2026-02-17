@@ -20,15 +20,12 @@
     "cracking",
     "malware creation",
     "opiniones políticas",
-    "deportes",
-    "entretenimiento",
     "recetas",
-    "desarrollo de software",
     "inversiones financieras"
   ],
   "response_style": {
-    "tone": "professional_formal",
+    "tone": "professional_friendly",
     "language": "es",
-    "max_words": 150
+    "max_words": 300
   }
 }

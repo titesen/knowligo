@@ -1,20 +1,20 @@
 {
   "version": "v1.0.0",
-  "created_at": "2026-02-14T11:24:43.467606",
+  "created_at": "2026-02-16T23:25:14.878482",
   "model_name": "paraphrase-multilingual-MiniLM-L12-v2",
   "embedding_dimension": 384,
   "total_chunks": 122,
   "total_vectors": 122,
   "documents_indexed": [
-    "plans.md",
-    "db_planes.md",
     "policies.md",
-    "company.md",
     "faq.md",
-    "sla.md",
-    "services.md",
+    "db_planes.md",
     "db_estadisticas.md",
-    "db_tickets_resumen.md"
+    "company.md",
+    "services.md",
+    "db_tickets_resumen.md",
+    "plans.md",
+    "sla.md"
   ],
   "index_type": "IndexFlatL2"
 }

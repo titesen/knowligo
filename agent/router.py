@@ -65,19 +65,34 @@ class IntentRouter:
         self._client = Groq(api_key=api_key)
         self._model = model
 
-    def classify(self, message: str) -> Dict:
+    def classify(
+        self,
+        message: str,
+        conversation_history: list[dict] | None = None,
+    ) -> Dict:
         """
         Clasifica un mensaje en una AgentIntent.
+
+        Args:
+            message: Texto del mensaje del usuario
+            conversation_history: Últimos mensajes (role/content dicts) para
+                contexto conversacional — mejora clasificación de anáforas
+                como "sí, el profesional" después de preguntar por planes.
 
         Returns:
             {"intent": AgentIntent, "confidence": float}
         """
         try:
+            messages = [{"role": "system", "content": _ROUTER_SYSTEM_PROMPT}]
+
+            # Incluir historial reciente para contexto (últimos 2 pares)
+            if conversation_history:
+                messages.extend(conversation_history[-4:])
+
+            messages.append({"role": "user", "content": message})
+
             completion = self._client.chat.completions.create(
-                messages=[
-                    {"role": "system", "content": _ROUTER_SYSTEM_PROMPT},
-                    {"role": "user", "content": message},
-                ],
+                messages=messages,
                 model=self._model,
                 temperature=0.0,
                 max_tokens=60,

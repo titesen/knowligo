@@ -124,14 +124,19 @@ def extract_sections(content: str, filename: str) -> List[Dict[str, str]]:
     return sections
 
 
-def chunk_text(text: str, chunk_size: int = 500, overlap: int = 50) -> List[str]:
+def chunk_text(text: str, chunk_size: int = 1024, overlap: int = 128) -> List[str]:
     """
     Divide un texto en chunks con overlap usando sliding window.
 
+    Lógica especial:
+    - Bloques de tabla markdown (líneas con ``|``) se mantienen como unidad atómica
+      (hasta 2048 chars).
+    - Bloques Q&A (### pregunta + respuesta) se mantienen juntos.
+
     Args:
         text: Texto a dividir
-        chunk_size: Tamaño máximo de cada chunk en caracteres
-        overlap: Número de caracteres de overlap entre chunks
+        chunk_size: Tamaño máximo de cada chunk en caracteres (default: 1024)
+        overlap: Número de caracteres de overlap entre chunks (default: 128)
 
     Returns:
         Lista de chunks de texto
@@ -143,47 +148,108 @@ def chunk_text(text: str, chunk_size: int = 500, overlap: int = 50) -> List[str]
     if len(text) <= chunk_size:
         return [text.strip()]
 
-    chunks = []
+    # --- Paso 1: separar bloques atómicos (tablas) del texto normal ---
+    blocks = _split_atomic_blocks(text)
+
+    chunks: list[str] = []
+    for block_text, is_atomic in blocks:
+        block_text = block_text.strip()
+        if not block_text:
+            continue
+
+        if is_atomic:
+            # Tablas / bloques atómicos: no partir (hard cap = 2048)
+            if len(block_text) <= 2048:
+                chunks.append(block_text)
+            else:
+                # Excepcionalmente largo — usar sliding window con tamaño mayor
+                chunks.extend(_sliding_window(block_text, 2048, overlap))
+        else:
+            # Texto normal: sliding window estándar
+            chunks.extend(_sliding_window(block_text, chunk_size, overlap))
+
+    return chunks
+
+
+def _split_atomic_blocks(text: str) -> list[tuple[str, bool]]:
+    """Separa el texto en bloques (texto, is_atomic).
+
+    Un bloque atómico es una secuencia contigua de líneas de tabla markdown
+    (empiezan con ``|``) incluyendo la línea de header inmediatamente anterior.
+    """
+    lines = text.split("\n")
+    blocks: list[tuple[str, bool]] = []
+    buf: list[str] = []
+    in_table = False
+
+    for line in lines:
+        is_table_line = line.strip().startswith("|")
+        if is_table_line and not in_table:
+            # Empezó una tabla — la línea anterior probablemente sea el header
+            header_line = ""
+            if buf:
+                header_line = buf.pop()  # quitar la última línea del buffer normal
+                if buf:
+                    blocks.append(("\n".join(buf), False))
+                    buf = []
+            in_table = True
+            if header_line:
+                buf.append(header_line)
+            buf.append(line)
+        elif is_table_line and in_table:
+            buf.append(line)
+        elif not is_table_line and in_table:
+            # Terminó la tabla
+            blocks.append(("\n".join(buf), True))
+            buf = [line]
+            in_table = False
+        else:
+            buf.append(line)
+
+    if buf:
+        blocks.append(("\n".join(buf), in_table))
+
+    return blocks
+
+
+def _sliding_window(text: str, chunk_size: int, overlap: int) -> list[str]:
+    """Sliding window clásico con corte en espacio/newline."""
+    if len(text) <= chunk_size:
+        return [text.strip()] if text.strip() else []
+
+    chunks: list[str] = []
     start = 0
 
     while start < len(text):
-        # Definir fin del chunk
         end = start + chunk_size
 
-        # Si no es el último chunk y hay más texto
         if end < len(text):
-            # Intentar cortar en un espacio o salto de línea para no partir palabras
-            # Buscar último espacio/salto dentro de los últimos 50 caracteres
-            search_start = max(start + chunk_size - 50, start)
+            search_start = max(start + chunk_size - 80, start)
             last_break = max(
                 text.rfind(" ", search_start, end), text.rfind("\n", search_start, end)
             )
-
             if last_break > start:
                 end = last_break
 
-        # Extraer chunk y limpiar
         chunk = text[start:end].strip()
-
-        if chunk:  # Solo agregar si no está vacío
+        if chunk:
             chunks.append(chunk)
 
-        # Mover start con overlap
         start = end - overlap if end < len(text) else len(text)
 
     return chunks
 
 
 def process_documents(
-    docs_path: str = None, chunk_size: int = 500, overlap: int = 50
+    docs_path: str = None, chunk_size: int = 1024, overlap: int = 128
 ) -> List[Dict]:
     """
     Procesa todos los documentos: carga, extrae secciones y chunking.
 
     Args:
         docs_path: Ruta al directorio de documentos
-        chunk_size: Tamaño de chunks en caracteres
-        overlap: Overlap entre chunks
+        chunk_size: Tamaño de chunks en caracteres (default: 1024)
+        overlap: Overlap entre chunks (default: 128)
 
     Returns:
         Lista de chunks con metadata completa

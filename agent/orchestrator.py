@@ -62,6 +62,8 @@ class AgentOrchestrator:
         self._conv = ConversationManager(self._db)
         self._router = IntentRouter(api_key=groq_api_key, model=llm_model)
         self._rag = rag_pipeline  # se inyecta desde main.py
+        self._groq_api_key = groq_api_key
+        self._llm_model = llm_model
 
         logger.info("AgentOrchestrator inicializado")
 
@@ -95,10 +97,28 @@ class AgentOrchestrator:
 
         # 3. Si hay flujo activo, intentar continuar
         if state != IDLE:
-            # Permitir cancelación global
-            if message.lower() in ("cancelar", "salir", "cancel"):
+            # Permitir cancelación global (vocabulario amplio)
+            cancel_phrases = {
+                "cancelar",
+                "salir",
+                "cancel",
+                "no quiero",
+                "dejá",
+                "olvidate",
+                "olvídate",
+                "volver",
+                "atrás",
+                "atras",
+                "no gracias",
+                "no, gracias",
+                "dejalo",
+                "dejálo",
+                "nada",
+                "mejor no",
+            }
+            if message.lower() in cancel_phrases:
                 self._conv.reset(phone)
-                return "Operación cancelada. ¿En qué puedo ayudarle?"
+                return "Operación cancelada. ¿En qué puedo ayudarte?"
 
             return self._continue_flow(phone, message, client, state, context)
 
@@ -112,12 +132,13 @@ class AgentOrchestrator:
                 )
             return start_registration(phone, self._conv)
 
-        # 5. Clasificar intención con LLM
-        result = self._router.classify(message)
+        # 5. Clasificar intención con LLM (con contexto conversacional)
+        recent = self._db.get_recent_messages(phone, limit=4)
+        result = self._router.classify(message, conversation_history=recent)
         intent = result["intent"]
 
         # 6. Despachar según intención
-        return self._dispatch(phone, message, client, intent)
+        return self._dispatch(phone, message, client, intent, recent)
 
     # Flow continuation
 
@@ -169,6 +190,7 @@ class AgentOrchestrator:
         message: str,
         client: Optional[Dict],
         intent: AgentIntent,
+        conversation_history: list[dict] | None = None,
     ) -> str:
         """Despacha según la intención clasificada."""
 
@@ -178,9 +200,13 @@ class AgentOrchestrator:
             return self._handle_saludo(client)
 
         if intent == AgentIntent.DESPEDIDA:
-            name = client["contact_name"] if client else ""
-            farewell = f"¡Hasta luego{', ' + name if name else ''}!"
-            return f"{farewell} Si necesita algo más, no dude en escribirnos."
+            name = client["contact_name"] if client else None
+            return self._llm_short_response(
+                f"Generá una despedida breve y cálida (1-2 oraciones, español argentino, vos) "
+                f"para un usuario de un chatbot de soporte IT (KnowLigo)."
+                f"{' El cliente se llama ' + name + '.' if name else ''} "
+                f"Invitá a volver cuando necesite algo. Variá el estilo.",
+            )
 
         if intent == AgentIntent.FUERA_DE_TEMA:
             return (
@@ -190,7 +216,7 @@ class AgentOrchestrator:
             )
 
         if intent == AgentIntent.CONSULTA_RAG:
-            return self._handle_rag_query(phone, message, client)
+            return self._handle_rag_query(phone, message, client, conversation_history)
 
         if intent == AgentIntent.VER_PLANES:
             plans = self._db.get_plans()
@@ -220,34 +246,28 @@ class AgentOrchestrator:
             return "No hay ninguna operación en curso para cancelar."
 
         # Fallback → RAG
-        return self._handle_rag_query(phone, message, client)
+        return self._handle_rag_query(phone, message, client, conversation_history)
 
     # Handlers internos
 
     def _handle_saludo(self, client: Optional[Dict]) -> str:
-        if client:
-            name = client["contact_name"]
-            return (
-                f"¡Hola, {name}! Bienvenido/a de vuelta a KnowLigo.\n\n"
-                "¿En qué puedo ayudarle hoy?\n"
-                "• Consultar *tickets* de soporte\n"
-                "• Ver *planes* disponibles\n"
-                "• *Contratar* un plan\n"
-                "• Crear un *ticket* nuevo\n"
-                "• Consultar su *cuenta*\n"
-                "• Hacer una *pregunta* sobre nuestros servicios"
-            )
-        else:
-            return (
-                "¡Hola! Bienvenido/a a KnowLigo, su aliado en soporte IT.\n\n"
-                "No lo tengo registrado aún. Puede:\n"
-                "• Escribir *registrar* para darse de alta como cliente\n"
-                "• Hacer una *pregunta* sobre nuestros servicios y planes\n"
-                "• Ver los *planes* disponibles"
-            )
+        """Genera un saludo variado usando el LLM."""
+        name = client["contact_name"] if client else None
+        return self._llm_short_response(
+            f"Generá un saludo breve y amigable (2-3 oraciones, español argentino, vos) "
+            f"para un usuario de un chatbot de soporte IT llamado KnowLigo."
+            f"{' El cliente se llama ' + name + '.' if name else ' El usuario no está registrado.'} "
+            f"Mencioná brevemente en qué podés ayudar (tickets, planes, consultas). "
+            f"Si no está registrado, sugerí escribir *registrar*. "
+            f"Variá el estilo — no uses siempre las mismas palabras.",
+        )
 
     def _handle_rag_query(
-        self, phone: str, message: str, client: Optional[Dict]
+        self,
+        phone: str,
+        message: str,
+        client: Optional[Dict],
+        conversation_history: list[dict] | None = None,
     ) -> str:
         """Delega la consulta informativa al pipeline RAG."""
         if self._rag is None:
@@ -260,6 +280,7 @@ class AgentOrchestrator:
             result = self._rag.process_query(
                 user_query=message,
                 user_id=phone,
+                conversation_history=conversation_history,
             )
             if result["success"]:
                 return result["response"]
@@ -286,6 +307,28 @@ class AgentOrchestrator:
         action = action_map.get(intent, "realizar esa acción")
         return (
             f"Para {action} necesita estar registrado como cliente.\n\n"
-            "Escriba *registrar* para darse de alta. Es rápido, solo necesito "
-            "su nombre, empresa y email."
+            "Escribá *registrar* para darse de alta. Es rápido, solo necesito "
+            "tu nombre, empresa y email."
         )
+
+    # LLM helper para respuestas cortas variadas (saludos, despedidas)
+
+    def _llm_short_response(self, instruction: str) -> str:
+        """Genera una respuesta corta con el LLM — para saludos/despedidas variados."""
+        try:
+            from groq import Groq
+
+            client = Groq(api_key=self._groq_api_key)
+            completion = client.chat.completions.create(
+                messages=[
+                    {"role": "system", "content": instruction},
+                    {"role": "user", "content": "generá el mensaje"},
+                ],
+                model=self._llm_model,
+                temperature=0.9,  # Alta variedad
+                max_tokens=150,
+            )
+            return completion.choices[0].message.content.strip()
+        except Exception as e:
+            logger.warning(f"LLM short response falló: {e}")
+            return "¡Hola! Soy el asistente de KnowLigo. ¿En qué puedo ayudarte?"

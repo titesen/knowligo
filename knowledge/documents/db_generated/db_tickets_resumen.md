@@ -4,23 +4,23 @@ Distribución de incidencias por categoría y prioridad.
 
 ## Por Categoría
 
-- **Software**: 6 tickets
+- **Software**: 7 tickets
 - **Red**: 4 tickets
 - **Seguridad**: 3 tickets
-- **Hardware**: 2 tickets
+- **Hardware**: 3 tickets
 - **Backup**: 2 tickets
 
 ## Por Prioridad
 
 - **Crítica**: 1 tickets
 - **Alta**: 4 tickets
-- **Media**: 7 tickets
-- **Baja**: 5 tickets
+- **Media**: 8 tickets
+- **Baja**: 6 tickets
 
 ## Por Estado
 
-- **Resuelto**: 11 tickets
-- **Abierto**: 2 tickets
+- **Resuelto**: 12 tickets
+- **Abierto**: 3 tickets
 - **En progreso**: 2 tickets
 - **Cerrado**: 1 tickets
 - **Esperando cliente**: 1 tickets

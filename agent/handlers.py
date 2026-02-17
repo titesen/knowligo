@@ -39,6 +39,117 @@ PRIORITY_MAP = {
     "critica": "Crítica",
 }
 
+# Mapeo fuzzy para lenguaje natural → prioridad
+_FUZZY_PRIORITY = {
+    # Baja
+    "no es grave": "Baja",
+    "no es urgente": "Baja",
+    "poco importante": "Baja",
+    "puede esperar": "Baja",
+    "cuando puedan": "Baja",
+    "sin apuro": "Baja",
+    "leve": "Baja",
+    "menor": "Baja",
+    "bajo": "Baja",
+    # Media
+    "normal": "Media",
+    "moderada": "Media",
+    "moderado": "Media",
+    "intermedia": "Media",
+    "medio": "Media",
+    "regular": "Media",
+    # Alta
+    "importante": "Alta",
+    "bastante importante": "Alta",
+    "urgente": "Alta",
+    "grave": "Alta",
+    "serio": "Alta",
+    "seria": "Alta",
+    "afecta mucho": "Alta",
+    "impacto alto": "Alta",
+    # Crítica
+    "muy urgente": "Crítica",
+    "es urgente": "Crítica",
+    "super urgente": "Crítica",
+    "crítico": "Crítica",
+    "critico": "Crítica",
+    "emergencia": "Crítica",
+    "no podemos trabajar": "Crítica",
+    "parado": "Crítica",
+    "detenido": "Crítica",
+    "caído": "Crítica",
+    "caido": "Crítica",
+    "máxima": "Crítica",
+    "maxima": "Crítica",
+}
+
+
+def _parse_priority(text: str) -> str | None:
+    """Intenta parsear prioridad desde texto libre.
+
+    1. Exacto against PRIORITY_MAP
+    2. Fuzzy against _FUZZY_PRIORITY (longest match first)
+    3. None si no se pudo determinar
+    """
+    key = text.strip().lower()
+
+    # 1. Exacto
+    if key in PRIORITY_MAP:
+        return PRIORITY_MAP[key]
+
+    # 2. Fuzzy — buscar si alguna frase clave aparece en el texto
+    #    Ordenar por longitud descendente para que frases más específicas
+    #    ("muy urgente") coincidan antes que substrings genéricos ("urgente")
+    for phrase, priority in sorted(
+        _FUZZY_PRIORITY.items(), key=lambda x: len(x[0]), reverse=True
+    ):
+        if phrase in key:
+            return priority
+
+    return None
+
+
+# Mapeo fuzzy para selección de planes
+_PLAN_KEYWORDS: dict[str, int] = {
+    "básico": 1,
+    "basico": 1,
+    "basic": 1,
+    "primero": 1,
+    "primer": 1,
+    "el 1": 1,
+    "profesional": 2,
+    "professional": 2,
+    "segundo": 2,
+    "el 2": 2,
+    "empresarial": 3,
+    "enterprise": 3,
+    "tercero": 3,
+    "tercer": 3,
+    "el 3": 3,
+}
+
+
+def _parse_plan_selection(text: str, db: DBService) -> dict | None:
+    """Parsea selección de plan desde texto libre.
+
+    Acepta: número (1/2/3), nombre del plan, o expresiones coloquiales.
+    """
+    clean = text.strip().lower()
+
+    # 1. Número directo
+    try:
+        plan_id = int(clean)
+        return db.get_plan_by_id(plan_id)
+    except ValueError:
+        pass
+
+    # 2. Keyword matching
+    for keyword, plan_id in _PLAN_KEYWORDS.items():
+        if keyword in clean:
+            return db.get_plan_by_id(plan_id)
+
+    return None
+
 
 def _format_price(amount: float) -> str:
     """Formatea un precio en ARS."""
@@ -157,10 +268,16 @@ def handle_create_ticket(
         )
 
     if state == TICKET_AWAIT_PRIORITY:
-        priority_input = message.strip().lower()
-        priority = PRIORITY_MAP.get(priority_input)
+        priority = _parse_priority(message)
         if not priority:
-            return "Prioridad no válida. Elija: Baja, Media, Alta o Crítica."
+            return (
+                "No pude identificar la prioridad. Podés escribir:\n\n"
+                "• *Baja* — No afecta operaciones\n"
+                "• *Media* — Afecta parcialmente\n"
+                "• *Alta* — Impacto significativo\n"
+                "• *Crítica* — Operación detenida\n\n"
+                'También vale algo como "es urgente" o "puede esperar".'
+            )
 
         ctx = conv.get_context(phone)
         ticket = db.create_ticket(
@@ -215,14 +332,14 @@ def handle_contract_plan(
     """Procesa los pasos de contratación de plan."""
 
     if state == CONTRACT_AWAIT_PLAN:
-        try:
-            plan_id = int(message.strip())
-        except ValueError:
-            return "Por favor, escriba el número del plan (1, 2 o 3)."
-
-        plan = db.get_plan_by_id(plan_id)
+        plan = _parse_plan_selection(message.strip(), db)
         if not plan:
-            return "Plan no encontrado. Escriba el número del plan (1, 2 o 3)."
+            return (
+                "Por favor, indicá el plan: el número (1, 2 o 3), "
+                "o su nombre (básico, profesional, empresarial)."
+            )
+
+        plan_id = plan["id"]
 
         conv.update_context(phone, plan_id=plan_id)
         conv.set_state(phone, CONTRACT_AWAIT_CONFIRM)
