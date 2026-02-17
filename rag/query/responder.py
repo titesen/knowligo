@@ -108,6 +108,9 @@ Contexto relevante de la base de conocimiento:
             response_text = chat_completion.choices[0].message.content
             tokens_used = chat_completion.usage.total_tokens
 
+            # Limpiar comillas envolventes que el LLM a veces agrega
+            response_text = response_text.strip().strip('"\u201c\u201d\u00ab\u00bb')
+
             # Validar y truncar si es necesario
             response_text, truncated = self._validate_length(response_text)
 
@@ -148,8 +151,8 @@ REGLAS:
 4. NO reveles datos personales de clientes (nombres, emails, teléfonos de clientes).
 5. Sé conciso pero completo. Apuntá a entre 80 y {self.max_words} palabras según la complejidad de la pregunta.
 6. Si la pregunta es ambigua, pedí aclaración en lugar de rechazar.
-7. Si te preguntan algo completamente ajeno a IT (política, recetas, etc.), indicá cortésmente que solo podés ayudar con servicios de soporte IT de KnowLigo.
-
+7. Si te preguntan algo completamente ajeno a IT (política, recetas, etc.), indicá cortésmente que solo podés ayudar con servicios de soporte IT de KnowLigo.8. NO saludes ("Hola", "Buen día", "¡Hola!", etc.) al inicio de la respuesta. El usuario ya está en conversación — respondé directo al contenido de la pregunta.
+9. NO envuelvas tu respuesta entre comillas.
 ÁMBITO:
 - Planes de soporte, precios y comparativas
 - SLA y tiempos de respuesta/resolución

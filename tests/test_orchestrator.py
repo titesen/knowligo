@@ -252,6 +252,94 @@ class TestOrchestratorCancelacion:
         resp = orchestrator.process_message(phone, "mejor no")
         assert "cancelada" in resp.lower()
 
+    def test_cancelar_substring_cancela_el_ticket(self, orchestrator):
+        """'Cancela el ticket' cancela un flujo activo (substring match)."""
+        phone = "5493794285297"
+        orchestrator._mock_router.classify.return_value = {
+            "intent": AgentIntent.CREAR_TICKET,
+            "confidence": 0.9,
+        }
+        orchestrator.process_message(phone, "Quiero crear un ticket")
+        resp = orchestrator.process_message(phone, "cancela el ticket")
+        assert "cancelada" in resp.lower()
+
+    def test_cancelar_substring_no_dejalo(self, orchestrator):
+        """'No, dejalo' cancela un flujo activo (substring match)."""
+        phone = "5491199990000"
+        orchestrator.process_message(phone, "registrar")
+        resp = orchestrator.process_message(phone, "No, dejalo")
+        assert "cancelada" in resp.lower()
+
+    def test_cancelar_substring_no_quiero_crear(self, orchestrator):
+        """'No quiero crear el ticket cancela' cancela (substring match)."""
+        phone = "5493794285297"
+        orchestrator._mock_router.classify.return_value = {
+            "intent": AgentIntent.CREAR_TICKET,
+            "confidence": 0.9,
+        }
+        orchestrator.process_message(phone, "Quiero crear un ticket")
+        resp = orchestrator.process_message(phone, "No quiero crear el ticket cancela")
+        assert "cancelada" in resp.lower()
+
+
+class TestCancelHintInFlows:
+    """Verifica que los prompts de flujo incluyan el hint de cancelación."""
+
+    def test_registration_shows_cancel_hint(self, orchestrator):
+        phone = "5491199990000"
+        resp = orchestrator.process_message(phone, "registrar")
+        assert "cancelar" in resp.lower()
+
+    def test_ticket_shows_cancel_hint(self, orchestrator):
+        phone = "5493794285297"
+        orchestrator._mock_router.classify.return_value = {
+            "intent": AgentIntent.CREAR_TICKET,
+            "confidence": 0.9,
+        }
+        resp = orchestrator.process_message(phone, "Quiero crear un ticket")
+        assert "cancelar" in resp.lower()
+
+
+class TestCasualExpressions:
+    """Expresiones casuales (emoticones, risas) dan respuesta breve."""
+
+    def test_smiley(self, orchestrator):
+        resp = orchestrator.process_message("5493794285297", ":)")
+        assert "necesitás" in resp.lower() or "😊" in resp
+
+    def test_jajaja(self, orchestrator):
+        resp = orchestrator.process_message("5493794285297", "jajaja")
+        assert "necesitás" in resp.lower() or "😊" in resp
+
+    def test_xd(self, orchestrator):
+        resp = orchestrator.process_message("5493794285297", "xD")
+        assert "necesitás" in resp.lower() or "😊" in resp
+
+
+class TestSinglePlanEnforcement:
+    """Cada cliente solo puede tener un plan activo."""
+
+    def test_client_with_active_plan_blocked(self, orchestrator):
+        """Cliente con plan activo NO puede contratar otro."""
+        # Acme Corp (client 1) tiene Plan Profesional activo
+        orchestrator._mock_router.classify.return_value = {
+            "intent": AgentIntent.CONTRATAR_PLAN,
+            "confidence": 0.9,
+        }
+        resp = orchestrator.process_message("541143210001", "Quiero contratar un plan")
+        assert "ya tenés" in resp.lower() or "plan activo" in resp.lower()
+        assert "interfaz web" in resp.lower()
+
+    def test_client_without_plan_can_contract(self, orchestrator):
+        """Cliente sin plan activo SÍ puede iniciar contratación (Demo Facundo)."""
+        orchestrator._mock_router.classify.return_value = {
+            "intent": AgentIntent.CONTRATAR_PLAN,
+            "confidence": 0.9,
+        }
+        resp = orchestrator.process_message("5493794285297", "Quiero contratar")
+        # Debe mostrar los planes disponibles
+        assert "Básico" in resp or "plan" in resp.lower()
+
 
 class TestOrchestratorFueraDeTema:
     def test_fuera_de_tema(self, orchestrator):

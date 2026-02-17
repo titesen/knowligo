@@ -97,33 +97,43 @@ class AgentOrchestrator:
 
         # 3. Si hay flujo activo, intentar continuar
         if state != IDLE:
-            # Permitir cancelación global (vocabulario amplio)
-            cancel_phrases = {
-                "cancelar",
-                "salir",
-                "cancel",
+            # Permitir cancelación global — búsqueda por substring
+            # (longest-first para evitar falsos positivos)
+            _cancel_phrases = [
+                "no quiero crear",
+                "cancela el ticket",
+                "no, gracias",
+                "no lo haga",
+                "no gracias",
                 "no quiero",
-                "dejá",
+                "mejor no",
+                "cancelar",
                 "olvidate",
                 "olvídate",
-                "volver",
+                "dejálo",
+                "dejalo",
+                "cancela",
+                "anular",
+                "anulá",
+                "dejá",
+                "salir",
+                "cancel",
                 "atrás",
                 "atras",
-                "no gracias",
-                "no, gracias",
-                "dejalo",
-                "dejálo",
-                "nada",
-                "mejor no",
-            }
-            if message.lower() in cancel_phrases:
+            ]
+            lower_msg = message.lower().strip()
+            if any(phrase in lower_msg for phrase in _cancel_phrases):
                 self._conv.reset(phone)
                 return "Operación cancelada. ¿En qué puedo ayudarte?"
 
             return self._continue_flow(phone, message, client, state, context)
 
-        # 4. Intercept "registrar" keyword before LLM routing
+        # 4. Intercept casual expressions (emoticons, jaja, etc.)
         lower_msg = message.lower().strip()
+        if self._is_casual_expression(lower_msg):
+            return "😊 ¿Necesitás algo más?"
+
+        # 5. Intercept "registrar" keyword before LLM routing
         if lower_msg in ("registrar", "registro", "registrarme", "darme de alta"):
             if client:
                 return (
@@ -132,12 +142,12 @@ class AgentOrchestrator:
                 )
             return start_registration(phone, self._conv)
 
-        # 5. Clasificar intención con LLM (con contexto conversacional)
+        # 6. Clasificar intención con LLM (con contexto conversacional)
         recent = self._db.get_recent_messages(phone, limit=4)
         result = self._router.classify(message, conversation_history=recent)
         intent = result["intent"]
 
-        # 6. Despachar según intención
+        # 7. Despachar según intención
         return self._dispatch(phone, message, client, intent, recent)
 
     # Flow continuation
@@ -202,10 +212,11 @@ class AgentOrchestrator:
         if intent == AgentIntent.DESPEDIDA:
             name = client["contact_name"] if client else None
             return self._llm_short_response(
-                f"Generá una despedida breve y cálida (1-2 oraciones, español argentino, vos) "
+                f"Generá UNA SOLA despedida breve y cálida (1-2 oraciones, español argentino, vos) "
                 f"para un usuario de un chatbot de soporte IT (KnowLigo)."
                 f"{' El cliente se llama ' + name + '.' if name else ''} "
-                f"Invitá a volver cuando necesite algo. Variá el estilo.",
+                f"Invitá a volver cuando necesite algo. Variá el estilo. "
+                f"IMPORTANTE: Respondé con UNA ÚNICA despedida. NO generes opciones, alternativas ni variantes separadas por 'O', 'O también:', 'También:', etc.",
             )
 
         if intent == AgentIntent.FUERA_DE_TEMA:
@@ -235,6 +246,16 @@ class AgentOrchestrator:
             return start_create_ticket(phone, client, self._conv)
 
         if intent == AgentIntent.CONTRATAR_PLAN:
+            # Verificar plan activo — solo se permite uno por cliente
+            active = self._db.get_active_contracts(client["id"])
+            if active:
+                plan_name = active[0]["plan_name"]
+                return (
+                    f"Ya tenés un plan activo: *Plan {plan_name}*. "
+                    f"Solo se permite un plan por cliente. "
+                    f"Si querés modificar o cancelar tu plan, podés hacerlo desde la interfaz web.\n\n"
+                    f"¿Puedo ayudarte con algo más?"
+                )
             plans = self._db.get_plans()
             return start_contract_plan(phone, client, plans, self._conv)
 
@@ -250,17 +271,76 @@ class AgentOrchestrator:
 
     # Handlers internos
 
+    _CASUAL_EXPRESSIONS = {
+        ":)",
+        ":(",
+        ":D",
+        ":d",
+        ":P",
+        ":p",
+        "xD",
+        "xd",
+        "jaja",
+        "jajaja",
+        "jajaj",
+        "jajajaja",
+        "jeje",
+        "jejeje",
+        "haha",
+        "hahaha",
+        "lol",
+        "lmao",
+        "😂",
+        "😄",
+        "👍",
+        "👏",
+        "🤣",
+        "😊",
+        "🙌",
+        "💪",
+        "🤗",
+        "ok",
+        "okey",
+        "dale",
+        "genial",
+        "perfecto",
+    }
+
+    def _is_casual_expression(self, text: str) -> bool:
+        """Detecta expresiones casuales cortas (emoticones, risas, emojis)."""
+        if text in self._CASUAL_EXPRESSIONS:
+            return True
+        # Pure emoji-only messages (1-3 emojis sin texto)
+        import re
+
+        if re.fullmatch(
+            r"[\U0001F000-\U0001FFFF\U00002600-\U000027BF\U0000FE00-\U0000FEFF\s]{1,10}",
+            text,
+        ):
+            return True
+        return False
+
     def _handle_saludo(self, client: Optional[Dict]) -> str:
         """Genera un saludo variado usando el LLM."""
-        name = client["contact_name"] if client else None
-        return self._llm_short_response(
-            f"Generá un saludo breve y amigable (2-3 oraciones, español argentino, vos) "
-            f"para un usuario de un chatbot de soporte IT llamado KnowLigo."
-            f"{' El cliente se llama ' + name + '.' if name else ' El usuario no está registrado.'} "
-            f"Mencioná brevemente en qué podés ayudar (tickets, planes, consultas). "
-            f"Si no está registrado, sugerí escribir *registrar*. "
-            f"Variá el estilo — no uses siempre las mismas palabras.",
-        )
+        if client:
+            name = client["contact_name"]
+            return self._llm_short_response(
+                f"Generá un saludo breve y amigable (2-3 oraciones, español argentino, vos) "
+                f"para un usuario de un chatbot de soporte IT llamado KnowLigo. "
+                f"El cliente YA está registrado y se llama {name}. "
+                f"NO sugieras registro de ninguna manera — el usuario ya es cliente. "
+                f"Mencioná brevemente en qué podés ayudar (ver tickets, consultar planes, crear incidencias, preguntas sobre servicios). "
+                f"Variá el estilo — no uses siempre las mismas palabras.",
+            )
+        else:
+            return self._llm_short_response(
+                f"Generá un saludo breve y amigable (2-3 oraciones, español argentino, vos) "
+                f"para un usuario de un chatbot de soporte IT llamado KnowLigo. "
+                f"El usuario NO está registrado como cliente aún. "
+                f"Sugerí que escriba *registrar* para darse de alta y recibir soporte personalizado, "
+                f"pero mencioná que aún así puede consultar información general de la empresa. "
+                f"Variá el estilo — no uses siempre las mismas palabras.",
+            )
 
     def _handle_rag_query(
         self,
@@ -328,7 +408,16 @@ class AgentOrchestrator:
                 temperature=0.9,  # Alta variedad
                 max_tokens=150,
             )
-            return completion.choices[0].message.content.strip()
+            text = completion.choices[0].message.content.strip()
+            # Limpiar comillas envolventes que el LLM a veces agrega
+            text = text.strip('"\u201c\u201d\u00ab\u00bb')
+            # Truncar si el LLM generó múltiples alternativas
+            for sep in ("\nO también", "\nO \n", "\n\nO ", "\nTambién:", "\n\nO:"):
+                idx = text.find(sep)
+                if idx > 0:
+                    text = text[:idx].rstrip()
+                    break
+            return text
         except Exception as e:
             logger.warning(f"LLM short response falló: {e}")
             return "¡Hola! Soy el asistente de KnowLigo. ¿En qué puedo ayudarte?"

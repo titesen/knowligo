@@ -20,7 +20,7 @@ INSERT INTO clients (name, industry, contact_name, contact_email, contact_phone,
 ('Demo Facundo',           'Tecnología',       'Facundo',           'facundo@demo.com.ar',             '+54 9 3794 28-5297', '5493794285297', 10, '2025-02-01'),
 ('Demo Contacto',          'Consultoría',      'Contacto Test',     'contacto@demo.com.ar',            '+54 9 3794 11-3485', '5493794113485', 5,  '2025-02-01');
 
--- CONTRATOS
+-- CONTRATOS (cada cliente tiene como máximo UN plan activo)
 INSERT INTO contracts (client_id, plan_id, start_date, end_date, status, monthly_amount, notes) VALUES
 (1, 2, '2024-09-01', NULL,          'Activo',    499000, 'Upgrade desde Básico en Nov 2024'),
 (2, 1, '2024-09-15', NULL,          'Activo',    199000, NULL),
@@ -29,9 +29,9 @@ INSERT INTO contracts (client_id, plan_id, start_date, end_date, status, monthly
 (5, 3, '2024-12-01', NULL,          'Activo',    999000, 'Incluye servidor dedicado en datacenter'),
 (6, 1, '2024-12-10', '2025-06-10', 'Cancelado', 199000, 'Canceló por reducción de presupuesto'),
 (7, 2, '2025-01-15', NULL,          'Activo',    499000, NULL),
-(8, 1, '2025-02-01', NULL,          'Activo',    199000, 'En período de prueba 30 días'),
-(9, 2, '2025-02-01', NULL,          'Activo',    499000, 'Demo — Plan Profesional'),
-(10, 1, '2025-02-01', NULL,         'Activo',    199000, 'Demo — Plan Básico');
+(8, 1, '2025-02-01', NULL,          'Activo',    199000, 'En período de prueba 30 días');
+-- Demo Facundo (9) y Demo Contacto (10): sin plan activo (para probar contratación)
+-- Hotel Palermo (6): contrato cancelado, sin plan vigente
 
 -- TICKETS DE SOPORTE
 INSERT INTO tickets (client_id, priority, status, category, subject, description, assigned_to, resolution, created_at, updated_at, resolved_at) VALUES

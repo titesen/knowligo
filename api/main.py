@@ -16,9 +16,11 @@ Endpoints:
 
 import asyncio
 import sys
+import time
 import httpx
 import sqlite3
 import logging
+from collections import OrderedDict
 from pathlib import Path
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Depends, HTTPException, Request
@@ -47,6 +49,31 @@ logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
 )
 logger = logging.getLogger(__name__)
+
+
+# Message deduplication — prevent double-processing of WhatsApp retries
+_MAX_SEEN = 500
+_SEEN_TTL = 300  # 5 minutes
+_seen_messages: OrderedDict[str, float] = OrderedDict()
+
+
+def _is_duplicate_message(msg_id: str) -> bool:
+    """Returns True if this message ID was already processed recently."""
+    now = time.monotonic()
+    # Purge expired entries
+    while _seen_messages:
+        oldest_key, oldest_time = next(iter(_seen_messages.items()))
+        if now - oldest_time > _SEEN_TTL:
+            _seen_messages.pop(oldest_key)
+        else:
+            break
+    if msg_id in _seen_messages:
+        return True
+    _seen_messages[msg_id] = now
+    # Cap size
+    while len(_seen_messages) > _MAX_SEEN:
+        _seen_messages.popitem(last=False)
+    return False
 
 
 # Dependency Injection
@@ -380,6 +407,12 @@ async def handle_webhook(
                     continue
 
                 for message in value["messages"]:
+                    # Deduplicate (WhatsApp may retry delivery)
+                    msg_id = message.get("id", "")
+                    if msg_id and _is_duplicate_message(msg_id):
+                        logger.info(f"Mensaje duplicado ignorado: {msg_id}")
+                        continue
+
                     # Solo procesar mensajes de texto
                     if message.get("type") != "text":
                         logger.info(

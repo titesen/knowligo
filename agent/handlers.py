@@ -26,6 +26,9 @@ from agent.db_service import DBService
 
 logger = logging.getLogger(__name__)
 
+# Hint de cancelación que se muestra en cada paso de los flujos
+_CANCEL_HINT = "\n\n_(Escribí *cancelar* para salir del proceso)_"
+
 # Helpers
 
 _EMAIL_RE = re.compile(r"^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$")
@@ -164,7 +167,7 @@ def start_registration(phone: str, conv: ConversationManager) -> str:
     conv.set_state(phone, REG_AWAIT_NAME, {})
     return (
         "¡Bienvenido a KnowLigo! Para registrarlo como cliente necesito algunos datos.\n\n"
-        "¿Cuál es su nombre completo?"
+        "¿Cuál es su nombre completo?" + _CANCEL_HINT
     )
 
 
@@ -181,22 +184,31 @@ def handle_registration(
     if state == REG_AWAIT_NAME:
         name = message.strip()
         if len(name) < 2:
-            return "Por favor, ingrese un nombre válido (mínimo 2 caracteres)."
+            return (
+                "Por favor, ingrese un nombre válido (mínimo 2 caracteres)."
+                + _CANCEL_HINT
+            )
         conv.set_state(phone, REG_AWAIT_COMPANY, {"name": name})
-        return f"Gracias, {name}. ¿Cuál es el nombre de su empresa u organización?"
+        return (
+            f"Gracias, {name}. ¿Cuál es el nombre de su empresa u organización?"
+            + _CANCEL_HINT
+        )
 
     if state == REG_AWAIT_COMPANY:
         company = message.strip()
         if len(company) < 2:
-            return "Por favor, ingrese un nombre de empresa válido."
+            return "Por favor, ingrese un nombre de empresa válido." + _CANCEL_HINT
         conv.update_context(phone, company=company)
         conv.set_state(phone, REG_AWAIT_EMAIL)
-        return "¿Cuál es su dirección de correo electrónico?"
+        return "¿Cuál es su dirección de correo electrónico?" + _CANCEL_HINT
 
     if state == REG_AWAIT_EMAIL:
         email = message.strip().lower()
         if not _EMAIL_RE.match(email):
-            return "El formato del email no es válido. Por favor, ingrese un email correcto (ej: nombre@empresa.com)."
+            return (
+                "El formato del email no es válido. Por favor, ingrese un email correcto (ej: nombre@empresa.com)."
+                + _CANCEL_HINT
+            )
 
         # Crear el cliente
         ctx = conv.get_context(phone)
@@ -230,7 +242,7 @@ def start_create_ticket(phone: str, client: Dict, conv: ConversationManager) -> 
     conv.set_state(phone, TICKET_AWAIT_SUBJECT, {"client_id": client["id"]})
     return (
         "Vamos a crear un ticket de soporte.\n\n"
-        "¿Cuál es el asunto o título del problema? (breve descripción)"
+        "¿Cuál es el asunto o título del problema? (breve descripción)" + _CANCEL_HINT
     )
 
 
@@ -247,15 +259,23 @@ def handle_create_ticket(
     if state == TICKET_AWAIT_SUBJECT:
         subject = message.strip()
         if len(subject) < 5:
-            return "Por favor, describa el asunto con al menos 5 caracteres."
+            return (
+                "Por favor, describa el asunto con al menos 5 caracteres."
+                + _CANCEL_HINT
+            )
         conv.update_context(phone, subject=subject)
         conv.set_state(phone, TICKET_AWAIT_DESCRIPTION)
-        return "Describa el problema con más detalle. ¿Qué está ocurriendo?"
+        return (
+            "Describa el problema con más detalle. ¿Qué está ocurriendo?" + _CANCEL_HINT
+        )
 
     if state == TICKET_AWAIT_DESCRIPTION:
         description = message.strip()
         if len(description) < 10:
-            return "Por favor, proporcione una descripción más detallada (mínimo 10 caracteres)."
+            return (
+                "Por favor, proporcione una descripción más detallada (mínimo 10 caracteres)."
+                + _CANCEL_HINT
+            )
         conv.update_context(phone, description=description)
         conv.set_state(phone, TICKET_AWAIT_PRIORITY)
         return (
@@ -264,7 +284,7 @@ def handle_create_ticket(
             "• *Media* — Afecta parcialmente\n"
             "• *Alta* — Impacto significativo\n"
             "• *Crítica* — Operación detenida\n\n"
-            "Escriba la prioridad:"
+            "Escriba la prioridad:" + _CANCEL_HINT
         )
 
     if state == TICKET_AWAIT_PRIORITY:
@@ -276,7 +296,7 @@ def handle_create_ticket(
                 "• *Media* — Afecta parcialmente\n"
                 "• *Alta* — Impacto significativo\n"
                 "• *Crítica* — Operación detenida\n\n"
-                'También vale algo como "es urgente" o "puede esperar".'
+                'También vale algo como "es urgente" o "puede esperar".' + _CANCEL_HINT
             )
 
         ctx = conv.get_context(phone)
@@ -316,7 +336,7 @@ def start_contract_plan(
             f"   {p['description'][:80]}…"
         )
 
-    lines.append("\nEscriba el *número* del plan que desea contratar:")
+    lines.append("\nEscriba el *número* del plan que desea contratar:" + _CANCEL_HINT)
     conv.set_state(phone, CONTRACT_AWAIT_PLAN, {"client_id": client["id"]})
     return "\n".join(lines)
 
@@ -336,7 +356,7 @@ def handle_contract_plan(
         if not plan:
             return (
                 "Por favor, indicá el plan: el número (1, 2 o 3), "
-                "o su nombre (básico, profesional, empresarial)."
+                "o su nombre (básico, profesional, empresarial)." + _CANCEL_HINT
             )
 
         plan_id = plan["id"]
@@ -360,7 +380,7 @@ def handle_contract_plan(
             f"• Horario: {plan['support_hours']}\n"
             f"• Incluye: {features_text}\n"
             f"• Mantenimiento: {plan['maintenance_frequency']}\n\n"
-            f"¿Confirma la contratación? Responda *sí* o *no*."
+            f"¿Confirma la contratación? Responda *sí* o *no*." + _CANCEL_HINT
         )
 
     if state == CONTRACT_AWAIT_CONFIRM:
@@ -372,13 +392,16 @@ def handle_contract_plan(
                 "1. Transferencia bancaria\n"
                 "2. Tarjeta de crédito\n"
                 "3. Mercado Pago\n\n"
-                "Escriba el número de su preferencia:"
+                "Escriba el número de su preferencia:" + _CANCEL_HINT
             )
         elif answer in ("no", "n", "cancelar"):
             conv.reset(phone)
             return "Contratación cancelada. ¿Puedo ayudarle con algo más?"
         else:
-            return "Por favor, responda *sí* para confirmar o *no* para cancelar."
+            return (
+                "Por favor, responda *sí* para confirmar o *no* para cancelar."
+                + _CANCEL_HINT
+            )
 
     if state == CONTRACT_AWAIT_PAYMENT:
         payment_methods = {
@@ -388,7 +411,7 @@ def handle_contract_plan(
         }
         method = payment_methods.get(message.strip())
         if not method:
-            return "Opción no válida. Escriba 1, 2 o 3."
+            return "Opción no válida. Escriba 1, 2 o 3." + _CANCEL_HINT
 
         ctx = conv.get_context(phone)
         plan = db.get_plan_by_id(ctx["plan_id"])
