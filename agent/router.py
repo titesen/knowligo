@@ -54,7 +54,9 @@ Intenciones válidas:
 Reglas:
 1. Si el usuario pide "cancelar" en contexto de un flujo activo, es CANCELAR.
 2. Si pregunta "qué planes tienen" es VER_PLANES; si dice "quiero contratar" es CONTRATAR_PLAN.
-3. Responde SOLO el JSON, sin explicaciones.
+3. Sé tolerante con errores de tipeo: "tiquets"/"tikets" → VER_TICKETS, "planz"/"plnaes" → VER_PLANES, "regsitrar" → SALUDO (se maneja aparte).
+4. Si el mensaje es incoherente, sin sentido, letras aleatorias o gibberish (ej: "dafasdf", "xyzqw") → FUERA_DE_TEMA.
+5. Responde SOLO el JSON, sin explicaciones.
 """
 
 

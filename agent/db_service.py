@@ -269,19 +269,81 @@ class DBService:
             conn.commit()
             return cursor.rowcount
 
+    # Interaction logging
+
+    def log_interaction(
+        self,
+        phone: str,
+        query: str,
+        intent: str,
+        response: str,
+        success: bool = True,
+        tokens_used: int = 0,
+        processing_time: float = 0.0,
+    ) -> None:
+        """Registra CUALQUIER interacción (no solo RAG) en query_logs."""
+        try:
+            with self._conn() as conn:
+                conn.execute(
+                    """
+                    INSERT INTO query_logs (
+                        user_id, query, intent, response, success, error,
+                        tokens_used, processing_time, timestamp
+                    )
+                    VALUES (?, ?, ?, ?, ?, NULL, ?, ?, ?)
+                    """,
+                    (
+                        phone,
+                        query,
+                        intent,
+                        response,
+                        1 if success else 0,
+                        tokens_used,
+                        processing_time,
+                        datetime.now().isoformat(),
+                    ),
+                )
+                conn.commit()
+        except Exception as e:
+            logger.warning(f"Error logging interaction: {e}")
+
+    def get_last_interaction_time(self, phone: str) -> Optional[datetime]:
+        """Obtiene el timestamp de la última interacción del usuario.
+
+        Returns:
+            datetime de la última interacción, o None si no hay historial.
+        """
+        with self._conn() as conn:
+            row = conn.execute(
+                """
+                SELECT timestamp FROM query_logs
+                WHERE user_id = ?
+                ORDER BY timestamp DESC
+                LIMIT 1
+                """,
+                (phone,),
+            ).fetchone()
+        if row and row["timestamp"]:
+            try:
+                return datetime.fromisoformat(row["timestamp"])
+            except (ValueError, TypeError):
+                return None
+        return None
+
     # Message history (from query_logs)
 
     def get_recent_messages(self, phone: str, limit: int = 6) -> list[dict]:
         """Obtiene los últimos mensajes usuario/asistente desde query_logs.
 
         Returns:
-            Lista de dicts con 'role' y 'content', ordenados cronológicamente
-            (más viejo primero). Formato compatible con OpenAI messages.
+            Lista de dicts con 'role' y 'content' (con timestamp embebido),
+            ordenados cronológicamente (más viejo primero).
+            Formato compatible con OpenAI messages.
         """
         with self._conn() as conn:
             rows = conn.execute(
                 """
-                SELECT query, response FROM query_logs
+                SELECT query, response, timestamp FROM query_logs
                 WHERE user_id = ? AND success = 1
                 ORDER BY timestamp DESC
                 LIMIT ?
@@ -292,7 +354,9 @@ class DBService:
         # rows vienen DESC; invertir para orden cronológico
         messages: list[dict] = []
         for row in reversed(rows):
-            messages.append({"role": "user", "content": row["query"]})
+            ts = row["timestamp"][:16].replace("T", " ") if row["timestamp"] else ""
+            ts_prefix = f"[{ts}] " if ts else ""
+            messages.append({"role": "user", "content": f"{ts_prefix}{row['query']}"})
             if row["response"]:
                 messages.append({"role": "assistant", "content": row["response"]})
         return messages

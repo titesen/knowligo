@@ -11,6 +11,8 @@ Flujo:
 
 import logging
 import re
+import time
+from datetime import datetime
 from pathlib import Path
 from typing import Dict, Optional
 
@@ -131,24 +133,54 @@ class AgentOrchestrator:
         # 4. Intercept casual expressions (emoticons, jaja, etc.)
         lower_msg = message.lower().strip()
         if self._is_casual_expression(lower_msg):
-            return "😊 ¿Necesitás algo más?"
+            resp = "😊 ¿Necesitás algo más?"
+            self._log_interaction(phone, message, "CASUAL", resp)
+            return resp
+
+        # 4b. Intercept menu keyword
+        if lower_msg in ("menú", "menu", "opciones", "ayuda", "help"):
+            resp = self._build_menu(client)
+            self._log_interaction(phone, message, "MENU", resp)
+            return resp
 
         # 5. Intercept "registrar" keyword before LLM routing
         if lower_msg in ("registrar", "registro", "registrarme", "darme de alta"):
             if client:
-                return (
+                resp = (
                     f"Ya se encuentra registrado como cliente, {client['contact_name']}. "
                     f"¿En qué puedo ayudarle?"
                 )
-            return start_registration(phone, self._conv)
+                self._log_interaction(phone, message, "REGISTRAR", resp)
+                return resp
+            resp = start_registration(phone, self._conv)
+            self._log_interaction(phone, message, "REGISTRAR", resp)
+            return resp
+
+        # 5b. Intercept gibberish / noise inputs (after known keywords)
+        if self._is_gibberish(lower_msg):
+            resp = (
+                "No entendí tu mensaje. ¿Podrías reformularlo?\n\n"
+                "Escribí *menú* para ver las opciones disponibles."
+            )
+            self._log_interaction(phone, message, "GIBBERISH", resp)
+            return resp
 
         # 6. Clasificar intención con LLM (con contexto conversacional)
-        recent = self._db.get_recent_messages(phone, limit=4)
+        recent = self._db.get_recent_messages(phone, limit=8)
         result = self._router.classify(message, conversation_history=recent)
         intent = result["intent"]
 
         # 7. Despachar según intención
-        return self._dispatch(phone, message, client, intent, recent)
+        resp = self._dispatch(phone, message, client, intent, recent)
+        # Log the interaction (RAG queries are also logged by the pipeline,
+        # but we log here for ALL intents uniformly)
+        self._log_interaction(
+            phone,
+            message,
+            intent.value if hasattr(intent, "value") else str(intent),
+            resp,
+        )
+        return resp
 
     # Flow continuation
 
@@ -207,7 +239,7 @@ class AgentOrchestrator:
         # Intenciones que NO requieren estar registrado
 
         if intent == AgentIntent.SALUDO:
-            return self._handle_saludo(client)
+            return self._handle_saludo(client, phone)
 
         if intent == AgentIntent.DESPEDIDA:
             name = client["contact_name"] if client else None
@@ -320,27 +352,159 @@ class AgentOrchestrator:
             return True
         return False
 
-    def _handle_saludo(self, client: Optional[Dict]) -> str:
-        """Genera un saludo variado usando el LLM."""
+    def _handle_saludo(self, client: Optional[Dict], phone: str) -> str:
+        """Genera un saludo variado usando el LLM + menú adaptativo.
+
+        Si el usuario interactuó hace menos de 30 minutos, omite el saludo
+        largo y devuelve un mensaje breve con menú.
+        """
+        # Smart greeting recency
+        last_time = self._db.get_last_interaction_time(phone)
+        if last_time:
+            minutes_ago = (datetime.now() - last_time).total_seconds() / 60
+            if minutes_ago < 30:
+                menu = self._build_menu(client)
+                return f"¡De vuelta! ¿En qué puedo ayudarte?\n\n{menu}"
+
         if client:
             name = client["contact_name"]
-            return self._llm_short_response(
-                f"Generá un saludo breve y amigable (2-3 oraciones, español argentino, vos) "
+            greeting = self._llm_short_response(
+                f"Generá un saludo breve (1 oración, español argentino, vos) "
                 f"para un usuario de un chatbot de soporte IT llamado KnowLigo. "
                 f"El cliente YA está registrado y se llama {name}. "
-                f"NO sugieras registro de ninguna manera — el usuario ya es cliente. "
-                f"Mencioná brevemente en qué podés ayudar (ver tickets, consultar planes, crear incidencias, preguntas sobre servicios). "
-                f"Variá el estilo — no uses siempre las mismas palabras.",
+                f"NO sugieras registro. Variá el estilo. "
+                f"IMPORTANTE: NO enumeres opciones ni menú — solo saludá.",
             )
         else:
-            return self._llm_short_response(
-                f"Generá un saludo breve y amigable (2-3 oraciones, español argentino, vos) "
+            greeting = self._llm_short_response(
+                f"Generá un saludo breve (1 oración, español argentino, vos) "
                 f"para un usuario de un chatbot de soporte IT llamado KnowLigo. "
                 f"El usuario NO está registrado como cliente aún. "
-                f"Sugerí que escriba *registrar* para darse de alta y recibir soporte personalizado, "
-                f"pero mencioná que aún así puede consultar información general de la empresa. "
-                f"Variá el estilo — no uses siempre las mismas palabras.",
+                f"Variá el estilo. "
+                f"IMPORTANTE: NO enumeres opciones ni menú — solo saludá.",
             )
+
+        menu = self._build_menu(client)
+        return f"{greeting}\n\n{menu}"
+
+    def _build_menu(self, client: Optional[Dict]) -> str:
+        """Construye un menú adaptativo según si el usuario es cliente o no."""
+        if client:
+            name = client["contact_name"]
+            return (
+                f"📌 *Menú de opciones — {name}*\n"
+                "━━━━━━━━━━━━━━━━━━━━\n"
+                "📋 *Ver planes* — Conocé nuestros planes\n"
+                "📩 *Crear ticket* — Reportá un problema\n"
+                "📝 *Ver mis tickets* — Consultá tus incidencias\n"
+                "💳 *Contratar plan* — Suscribite a un plan\n"
+                "👤 *Mi cuenta* — Consultá tu información\n"
+                "💬 *Consultar* — Preguntame lo que necesites\n"
+                "━━━━━━━━━━━━━━━━━━━━\n"
+                "Escribí la opción o tu consulta directamente."
+            )
+        else:
+            return (
+                "📌 *Menú de opciones*\n"
+                "━━━━━━━━━━━━━━━━━━━━\n"
+                "📝 *Registrarme* — Darme de alta como cliente\n"
+                "📋 *Ver planes* — Conocé nuestros planes\n"
+                "💬 *Consultar* — Preguntame sobre nuestros servicios\n"
+                "━━━━━━━━━━━━━━━━━━━━\n"
+                "Escribí la opción o tu consulta directamente."
+            )
+
+    def _is_gibberish(self, text: str) -> bool:
+        """Detecta entradas de ruido / gibberish.
+
+        Heuristics:
+        - Single punctuation or repeated punctuation only
+        - Very short non-word (≤2 chars, not a known expression)
+        - No vowels in a 4+ char word
+        - High consonant ratio (>0.8) in 4+ char word
+        - Mixed digits + chars looking random
+        """
+        import re as _re
+
+        # Pure punctuation / symbols (???, ..., !!!)
+        if _re.fullmatch(r"[^\w\s]+", text):
+            return True
+
+        # Single character that's not a meaningful word
+        if len(text) == 1 and text not in ("y", "o", "a", "e", "u"):
+            return True
+
+        # Very short (2 chars) — only if not a known word/expression
+        _short_valid = {
+            "si",
+            "sí",
+            "no",
+            "ok",
+            "va",
+            "ya",
+            "eh",
+            "ah",
+            "ey",
+            "uy",
+            "ay",
+            "oh",
+            "je",
+            "ja",
+            "xd",
+        }
+        if len(text) <= 2 and text not in _short_valid:
+            return True
+
+        # For 4+ char tokens: check for no vowels at all
+        clean = _re.sub(r"[^a-záéíóúüñ]", "", text)
+        if len(clean) >= 4:
+            vowels = set("aeiouáéíóúü")
+            vowel_count = sum(1 for c in clean if c in vowels)
+            if vowel_count == 0:
+                return True
+            # High consonant ratio (>0.85)
+            consonant_ratio = 1 - (vowel_count / len(clean))
+            if consonant_ratio > 0.85:
+                return True
+            # Single word with 3+ consecutive consonants AND high ratio
+            # (e.g. "dafasdf" has "sdf"; real words like "construir" have lower ratio)
+            if " " not in text and len(clean) >= 5 and consonant_ratio > 0.6:
+                consonant_chars = set("bcdfghjklmnñpqrstvwxyz")
+                run = 0
+                for c in clean:
+                    if c in consonant_chars:
+                        run += 1
+                        if run >= 3:
+                            return True
+                    else:
+                        run = 0
+
+        # Mixed digits + letters looking random (like "23129fdagf")
+        if _re.fullmatch(r"(?=.*[a-zA-Z])(?=.*\d)[a-zA-Z\d]{5,}", text):
+            # But skip things that look like ticket IDs or phone numbers
+            if not _re.fullmatch(r"[A-Z]{2,4}-?\d{3,}", text, _re.IGNORECASE):
+                return True
+
+        return False
+
+    def _log_interaction(
+        self,
+        phone: str,
+        query: str,
+        intent: str,
+        response: str,
+    ) -> None:
+        """Registra la interacción en query_logs para historial y analytics."""
+        try:
+            self._db.log_interaction(
+                phone=phone,
+                query=query,
+                intent=intent,
+                response=response,
+                success=True,
+            )
+        except Exception as e:
+            logger.warning(f"[{phone}] Error logging interaction: {e}")
 
     def _handle_rag_query(
         self,

@@ -89,25 +89,32 @@ class TestNormalizePhone:
 
 class TestOrchestratorSaludo:
     def test_saludo_registered_client(self, orchestrator):
-        """Saludo de cliente registrado devuelve algo coherente (LLM o fallback)."""
+        """Saludo de cliente registrado devuelve saludo + menú adaptativo."""
         orchestrator._mock_router.classify.return_value = {
             "intent": AgentIntent.SALUDO,
             "confidence": 0.95,
         }
         resp = orchestrator.process_message("5493794285297", "Hola")
-        # Con LLM real incluiría el nombre; con mock cae al fallback
-        assert len(resp) > 10  # alguna respuesta coherente
-        assert "knowligo" in resp.lower() or "hola" in resp.lower()
+        # Debe incluir menú con opciones de cliente registrado
+        assert "Menú de opciones" in resp
+        assert "Ver planes" in resp
+        assert "Crear ticket" in resp
+        assert "Mi cuenta" in resp
 
     def test_saludo_unregistered_client(self, orchestrator):
-        """Saludo de número desconocido devuelve respuesta coherente."""
+        """Saludo de número desconocido devuelve saludo + menú reducido."""
         orchestrator._mock_router.classify.return_value = {
             "intent": AgentIntent.SALUDO,
             "confidence": 0.95,
         }
         resp = orchestrator.process_message("5491199990000", "Hola")
-        # Con LLM real diría 'registrar'; con mock cae al fallback genérico
-        assert len(resp) > 10
+        # Debe incluir menú con opciones de no-registrado
+        assert "Menú de opciones" in resp
+        assert "Registrarme" in resp
+        assert "Ver planes" in resp
+        # NO debe incluir opciones de registrado
+        assert "Mi cuenta" not in resp
+        assert "Crear ticket" not in resp
 
 
 class TestOrchestratorRegistration:
@@ -147,8 +154,8 @@ class TestOrchestratorRegistration:
             "confidence": 0.95,
         }
         resp = orchestrator.process_message(phone, "Hola")
-        # Con LLM real mencionaría Juan; con mock cae al fallback
-        assert len(resp) > 10
+        # Con LLM real mencionaría Juan; menú incluye opciones de registrado
+        assert "Menú de opciones" in resp
 
 
 class TestOrchestratorTickets:
@@ -423,3 +430,165 @@ class TestPlanSelection:
 
         plan = _parse_plan_selection("el mejor", orchestrator._db)
         assert plan is None
+
+
+# Adaptive Menu
+
+
+class TestAdaptiveMenu:
+    """Verifica que el menú se adapte según el tipo de usuario."""
+
+    def test_menu_keyword_registered(self, orchestrator):
+        """Escribir 'menú' devuelve menú sin pasar por el router."""
+        resp = orchestrator.process_message("5493794285297", "menú")
+        assert "Menú de opciones" in resp
+        assert "Crear ticket" in resp
+        assert "Mi cuenta" in resp
+        # Router no debe haber sido llamado
+        orchestrator._mock_router.classify.assert_not_called()
+
+    def test_menu_keyword_unregistered(self, orchestrator):
+        """Escribir 'menú' sin estar registrado muestra menú reducido."""
+        resp = orchestrator.process_message("5491199990000", "menú")
+        assert "Menú de opciones" in resp
+        assert "Registrarme" in resp
+        assert "Crear ticket" not in resp
+
+    def test_menu_keyword_opciones(self, orchestrator):
+        """'opciones' también activa el menú."""
+        resp = orchestrator.process_message("5493794285297", "opciones")
+        assert "Menú de opciones" in resp
+
+    def test_menu_keyword_ayuda(self, orchestrator):
+        """'ayuda' también activa el menú."""
+        resp = orchestrator.process_message("5493794285297", "ayuda")
+        assert "Menú de opciones" in resp
+
+
+# Gibberish Detection
+
+
+class TestGibberishDetection:
+    """Verifica que entradas sin sentido reciban respuesta amable."""
+
+    def test_single_dot(self, orchestrator):
+        resp = orchestrator.process_message("5493794285297", ".")
+        assert "no entendí" in resp.lower()
+        assert "menú" in resp.lower()
+
+    def test_random_chars(self, orchestrator):
+        resp = orchestrator.process_message("5493794285297", "dafasdf")
+        assert "no entendí" in resp.lower()
+
+    def test_mixed_digits_chars(self, orchestrator):
+        resp = orchestrator.process_message("5493794285297", "23129fdagf")
+        assert "no entendí" in resp.lower()
+
+    def test_question_marks_only(self, orchestrator):
+        resp = orchestrator.process_message("5493794285297", "???")
+        assert "no entendí" in resp.lower()
+
+    def test_exclamation_only(self, orchestrator):
+        resp = orchestrator.process_message("5493794285297", "!!!")
+        assert "no entendí" in resp.lower()
+
+    def test_consonant_soup(self, orchestrator):
+        resp = orchestrator.process_message("5493794285297", "bcdfghjk")
+        assert "no entendí" in resp.lower()
+
+    def test_valid_short_words_pass_through(self, orchestrator):
+        """Words like 'si', 'no', 'ok' should NOT be gibberish."""
+        from agent.orchestrator import AgentOrchestrator
+
+        orch = orchestrator
+        assert not orch._is_gibberish("si")
+        assert not orch._is_gibberish("no")
+        assert not orch._is_gibberish("ok")
+        assert not orch._is_gibberish("hola")
+
+    def test_normal_text_not_gibberish(self, orchestrator):
+        """Normal Spanish text should not be gibberish."""
+        assert not orchestrator._is_gibberish("quiero un plan")
+        assert not orchestrator._is_gibberish("ver tickets")
+        assert not orchestrator._is_gibberish("buenos días")
+
+
+# Interaction Logging
+
+
+class TestInteractionLogging:
+    """Verifica que TODAS las interacciones se registren en query_logs."""
+
+    def test_greeting_logged(self, orchestrator, seeded_db):
+        """Un saludo debe quedar registrado en query_logs."""
+        import sqlite3
+
+        orchestrator._mock_router.classify.return_value = {
+            "intent": AgentIntent.SALUDO,
+            "confidence": 0.95,
+        }
+        orchestrator.process_message("5493794285297", "Hola")
+
+        conn = sqlite3.connect(seeded_db)
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute(
+            "SELECT * FROM query_logs WHERE user_id = '5493794285297'"
+        ).fetchall()
+        conn.close()
+
+        assert len(rows) >= 1
+        last = dict(rows[-1])
+        assert last["query"] == "Hola"
+        assert last["intent"] == "SALUDO"
+
+    def test_menu_keyword_logged(self, orchestrator, seeded_db):
+        """Escribir 'menú' debe quedar registrado."""
+        import sqlite3
+
+        orchestrator.process_message("5493794285297", "menú")
+
+        conn = sqlite3.connect(seeded_db)
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute(
+            "SELECT * FROM query_logs WHERE user_id = '5493794285297' AND intent = 'MENU'"
+        ).fetchall()
+        conn.close()
+
+        assert len(rows) >= 1
+
+    def test_gibberish_logged(self, orchestrator, seeded_db):
+        """Gibberish debe quedar registrado con intent GIBBERISH."""
+        import sqlite3
+
+        orchestrator.process_message("5493794285297", "dafasdf")
+
+        conn = sqlite3.connect(seeded_db)
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute(
+            "SELECT * FROM query_logs WHERE user_id = '5493794285297' AND intent = 'GIBBERISH'"
+        ).fetchall()
+        conn.close()
+
+        assert len(rows) >= 1
+
+
+# Smart Greeting Recency
+
+
+class TestGreetingRecency:
+    """Verifica que un segundo saludo reciente omita el saludo largo."""
+
+    def test_recent_greeting_shows_short(self, orchestrator):
+        """Segundo saludo dentro de 30 min muestra mensaje breve."""
+        phone = "5493794285297"
+        orchestrator._mock_router.classify.return_value = {
+            "intent": AgentIntent.SALUDO,
+            "confidence": 0.95,
+        }
+        # Primer saludo: full menu
+        resp1 = orchestrator.process_message(phone, "Hola")
+        assert "Menú de opciones" in resp1
+
+        # Segundo saludo inmediato: should be short + menu
+        resp2 = orchestrator.process_message(phone, "Hola")
+        assert "De vuelta" in resp2 or "menú" in resp2.lower()

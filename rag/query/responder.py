@@ -9,6 +9,7 @@ Este módulo:
 """
 
 import logging
+from datetime import datetime
 from typing import List, Dict, Optional
 
 try:
@@ -136,7 +137,11 @@ Contexto relevante de la base de conocimiento:
 
     def _build_system_prompt(self) -> str:
         """Construye el system prompt para el LLM"""
+        now = datetime.now()
+        date_str = now.strftime("%A %d de %B de %Y, %H:%M hs")
         return f"""Sos el asistente virtual de KnowLigo, empresa argentina de soporte IT para PyMEs.
+
+FECHA Y HORA ACTUAL: {date_str}
 
 PERSONALIDAD:
 - Hablás en español argentino neutro (vos/ustedes). Tono profesional pero amigable.
