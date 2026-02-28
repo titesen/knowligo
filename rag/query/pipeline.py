@@ -320,12 +320,18 @@ class RAGPipeline:
             cursor = conn.cursor()
 
             # Contar queries en la última hora
+            # Solo contar queries RAG reales (intent=CONSULTA_RAG o intents del
+            # pipeline propio), no interacciones del orchestrator (SALUDO, MENU, etc.)
             one_hour_ago = datetime.now() - timedelta(hours=1)
 
             cursor.execute(
                 """
                 SELECT COUNT(*) FROM query_logs
                 WHERE user_id = ? AND timestamp > ? AND success = 1
+                  AND intent NOT IN ('SALUDO', 'DESPEDIDA', 'CASUAL', 'GIBBERISH',
+                                     'MENU', 'REGISTRAR', 'CANCELAR', 'FUERA_DE_TEMA',
+                                     'VER_TICKETS', 'CREAR_TICKET', 'VER_PLANES',
+                                     'CONTRATAR_PLAN', 'CONSULTA_CUENTA')
             """,
                 (user_id, one_hour_ago.isoformat()),
             )
