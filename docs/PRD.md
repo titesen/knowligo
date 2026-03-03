@@ -663,7 +663,7 @@ knowligo/
 - [x] Logging estructurado
 - [x] API REST con FastAPI (/webhook, /query, /health, /stats)
 - [x] Docker Compose deployment
-- [x] Documentación completa (AGENTS.md, ADRs, diagramas Mermaid, PRD, INDEX, llms.txt)
+- [x] Documentación completa (ADRs, diagramas Mermaid, PRD, INDEX)
 - [x] Tests unitarios con pytest (145 tests)
 - [x] Embeddings multilingües + Cross-Encoder reranking
 - [x] Caché semántico + Protección prompt injection

@@ -5,7 +5,6 @@
 ## Requisitos Previos
 
 - Python 3.11+
-- Leer [AGENTS.md](AGENTS.md) antes de hacer cambios (contiene reglas de arquitectura)
 
 ## Flujo de Trabajo
 
@@ -45,11 +44,11 @@
 - **Tests**: Indicar qué tests se agregaron o modificaron
 - **Checklist**:
   - [ ] Los tests pasan (`pytest tests/ -v`)
-  - [ ] Se respetan las reglas de dependencia entre capas (ver AGENTS.md §3)
+  - [ ] Se respetan las reglas de dependencia entre capas
   - [ ] No hay `print()` en código runtime
   - [ ] No hay secrets hardcodeados
 
-## Reglas de Dependencia (ver AGENTS.md)
+## Reglas de Dependencia
 
 ```
 api/       → puede importar de agent/ y rag/query/

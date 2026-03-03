@@ -38,5 +38,5 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 - API REST: /webhook, /query, /health, /stats
 - Docker multi-stage build con non-root user y healthcheck
 - Base de conocimiento: 6 documentos Markdown (empresa, planes, servicios, SLA, políticas, FAQ)
-- Documentación: AGENTS.md, 4 ADRs, 6 diagramas Mermaid, PRD, INDEX, llms.txt
+- Documentación: 4 ADRs, 6 diagramas Mermaid, PRD, INDEX
 - 119 tests unitarios e integración con pytest

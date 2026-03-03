@@ -4,7 +4,6 @@
 > Cada línea: descripción breve + ruta al archivo.
 
 ## Contexto del Proyecto
-- [AGENTS.md](../AGENTS.md): Contexto completo para agentes de IA — arquitectura, reglas, patrones, límites
 - [README.md](../README.md): Documentación principal — quick start, endpoints, configuración, roadmap
 
 ## Documentación Técnica

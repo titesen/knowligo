@@ -11,12 +11,10 @@
 
 | Documento | Audiencia | Descripción |
 |-----------|-----------|-------------|
-| [AGENTS.md](AGENTS.md) | 🤖 AI Agents | Contexto completo para coding agents — arquitectura, reglas, patrones |
 | [docs/INDEX.md](docs/INDEX.md) | 👤 Todos | Índice principal de toda la documentación |
 | [docs/diagrams/](docs/diagrams/architecture.md) | 👤 Todos | Diagramas Mermaid — C4, ERD, pipeline RAG, máquina de estados |
 | [docs/adr/](docs/adr/) | 🏗️ Arquitectos | Decisiones arquitectónicas (SQLite, FAISS+BM25, Groq, webhook) |
 | [docs/PRD.md](docs/PRD.md) | 📋 Product | Product Requirements Document completo |
-| [llms.txt](llms.txt) | 🤖 AI Agents | Índice legible por máquina (estándar llms.txt) |
 
 ## 📋 Descripción
 
