@@ -172,7 +172,7 @@ knowligo/
 │   │                      #   tickets, conversations, payments)
 │   ├── seeds/             # Datos de prueba
 │   └── sqlite/            # Base de datos
-├── tests/                 # Tests con pytest (119 tests)
+├── tests/                 # Tests con pytest (145 tests)
 │   ├── test_api.py        # Tests de endpoints FastAPI
 │   ├── test_orchestrator.py # Tests del agente (flujos completos)
 │   ├── test_db_service.py # Tests de capa de datos
@@ -226,7 +226,7 @@ curl -X POST http://localhost:8000/query `
 ### Tests unitarios con pytest
 
 ```powershell
-# Ejecutar todos los tests (119 tests)
+# Ejecutar todos los tests (145 tests)
 python -m pytest tests/ -v
 
 # Tests específicos
@@ -333,7 +333,7 @@ LLM_MODEL=llama-3.3-70b-versatile
 - [x] **Registro de usuarios, creación de tickets, contratación de planes**
 - [x] **Pagos mock y sistema de contratos**
 - [x] **LLM Router para clasificación de intenciones**
-- [x] Tests unitarios con pytest (119 tests)
+- [x] Tests unitarios con pytest (145 tests)
 - [ ] Monitoreo con Prometheus/Grafana
 - [ ] Frontend web para administración
 - [ ] Soporte para múltiples idiomas

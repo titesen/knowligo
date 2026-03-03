@@ -7,7 +7,7 @@ y devuelve un string de respuesta para el usuario.
 
 import logging
 import re
-from typing import Dict, Optional
+from typing import Dict, Optional, Union
 
 from agent.conversation import (
     ConversationManager,
@@ -23,6 +23,14 @@ from agent.conversation import (
     CONTRACT_AWAIT_PAYMENT,
 )
 from agent.db_service import DBService
+from agent.messages import (
+    AgentResponse,
+    ButtonMessage,
+    ListMessage,
+    ListRow,
+    ListSection,
+    ReplyButton,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -40,6 +48,11 @@ PRIORITY_MAP = {
     "alta": "Alta",
     "crítica": "Crítica",
     "critica": "Crítica",
+    # Interactive button IDs (WhatsApp list_reply)
+    "prioridad_baja": "Baja",
+    "prioridad_media": "Media",
+    "prioridad_alta": "Alta",
+    "prioridad_critica": "Crítica",
 }
 
 # Mapeo fuzzy para lenguaje natural → prioridad
@@ -129,6 +142,10 @@ _PLAN_KEYWORDS: dict[str, int] = {
     "tercero": 3,
     "tercer": 3,
     "el 3": 3,
+    # Interactive button IDs (WhatsApp list_reply)
+    "plan_1": 1,
+    "plan_2": 2,
+    "plan_3": 3,
 }
 
 
@@ -253,7 +270,7 @@ def handle_create_ticket(
     context: Dict,
     conv: ConversationManager,
     db: DBService,
-) -> str:
+) -> AgentResponse:
     """Procesa los pasos de creación de ticket."""
 
     if state == TICKET_AWAIT_SUBJECT:
@@ -278,25 +295,43 @@ def handle_create_ticket(
             )
         conv.update_context(phone, description=description)
         conv.set_state(phone, TICKET_AWAIT_PRIORITY)
-        return (
-            "¿Cuál es la prioridad del ticket?\n\n"
-            "• *Baja* — No afecta operaciones\n"
-            "• *Media* — Afecta parcialmente\n"
-            "• *Alta* — Impacto significativo\n"
-            "• *Crítica* — Operación detenida\n\n"
-            "Escriba la prioridad:" + _CANCEL_HINT
+        return ListMessage(
+            body="¿Cuál es la prioridad del ticket?",
+            button_text="Elegir prioridad",
+            footer="_(Escribí *cancelar* para salir del proceso)_",
+            sections=[
+                ListSection(
+                    title="Prioridad",
+                    rows=[
+                        ListRow("prioridad_baja", "Baja", "No afecta operaciones"),
+                        ListRow("prioridad_media", "Media", "Afecta parcialmente"),
+                        ListRow("prioridad_alta", "Alta", "Impacto significativo"),
+                        ListRow("prioridad_critica", "Crítica", "Operación detenida"),
+                    ],
+                ),
+            ],
         )
 
     if state == TICKET_AWAIT_PRIORITY:
         priority = _parse_priority(message)
         if not priority:
-            return (
-                "No pude identificar la prioridad. Podés escribir:\n\n"
-                "• *Baja* — No afecta operaciones\n"
-                "• *Media* — Afecta parcialmente\n"
-                "• *Alta* — Impacto significativo\n"
-                "• *Crítica* — Operación detenida\n\n"
-                'También vale algo como "es urgente" o "puede esperar".' + _CANCEL_HINT
+            return ListMessage(
+                body='No pude identificar la prioridad. También vale algo como "es urgente" o "puede esperar".',
+                button_text="Elegir prioridad",
+                footer="_(Escribí *cancelar* para salir del proceso)_",
+                sections=[
+                    ListSection(
+                        title="Prioridad",
+                        rows=[
+                            ListRow("prioridad_baja", "Baja", "No afecta operaciones"),
+                            ListRow("prioridad_media", "Media", "Afecta parcialmente"),
+                            ListRow("prioridad_alta", "Alta", "Impacto significativo"),
+                            ListRow(
+                                "prioridad_critica", "Crítica", "Operación detenida"
+                            ),
+                        ],
+                    ),
+                ],
             )
 
         ctx = conv.get_context(phone)
@@ -327,18 +362,27 @@ def handle_create_ticket(
 
 def start_contract_plan(
     phone: str, client: Dict, plans: list, conv: ConversationManager
-) -> str:
+) -> AgentResponse:
     """Inicia el flujo de contratación mostrando planes disponibles."""
-    lines = ["Estos son nuestros planes disponibles:\n"]
+    rows = []
     for p in plans:
-        lines.append(
-            f"*{p['id']}. {p['name']}* — {_format_price(p['price_ars'])}/mes\n"
-            f"   {p['description'][:80]}…"
+        rows.append(
+            ListRow(
+                id=f"plan_{p['id']}",
+                title=p["name"],
+                description=f"{_format_price(p['price_ars'])}/mes",
+            )
         )
 
-    lines.append("\nEscriba el *número* del plan que desea contratar:" + _CANCEL_HINT)
     conv.set_state(phone, CONTRACT_AWAIT_PLAN, {"client_id": client["id"]})
-    return "\n".join(lines)
+    return ListMessage(
+        body="Estos son nuestros planes disponibles:",
+        button_text="Ver planes",
+        footer="_(Escribí *cancelar* para salir del proceso)_",
+        sections=[
+            ListSection(title="Planes", rows=rows),
+        ],
+    )
 
 
 def handle_contract_plan(
@@ -348,7 +392,7 @@ def handle_contract_plan(
     context: Dict,
     conv: ConversationManager,
     db: DBService,
-) -> str:
+) -> AgentResponse:
     """Procesa los pasos de contratación de plan."""
 
     if state == CONTRACT_AWAIT_PLAN:
@@ -373,28 +417,46 @@ def handle_contract_plan(
             features.append("DRP")
         features_text = ", ".join(features) if features else "Soporte remoto"
 
-        return (
-            f"Ha seleccionado el *Plan {plan['name']}*:\n\n"
-            f"• Precio: {_format_price(plan['price_ars'])}/mes (ARS, sujeto a ajuste trimestral)\n"
-            f"• Tickets/mes: {plan['max_tickets_month'] or 'Ilimitados'}\n"
-            f"• Horario: {plan['support_hours']}\n"
-            f"• Incluye: {features_text}\n"
-            f"• Mantenimiento: {plan['maintenance_frequency']}\n\n"
-            f"¿Confirma la contratación? Responda *sí* o *no*." + _CANCEL_HINT
+        return ButtonMessage(
+            body=(
+                f"Ha seleccionado el *Plan {plan['name']}*:\n\n"
+                f"• Precio: {_format_price(plan['price_ars'])}/mes (ARS, sujeto a ajuste trimestral)\n"
+                f"• Tickets/mes: {plan['max_tickets_month'] or 'Ilimitados'}\n"
+                f"• Horario: {plan['support_hours']}\n"
+                f"• Incluye: {features_text}\n"
+                f"• Mantenimiento: {plan['maintenance_frequency']}\n\n"
+                f"¿Confirma la contratación?"
+            ),
+            buttons=[
+                ReplyButton("confirmar_si", "✅ Sí, confirmo"),
+                ReplyButton("confirmar_no", "❌ No, cancelar"),
+            ],
+            footer="_(Escribí *cancelar* para salir del proceso)_",
         )
 
     if state == CONTRACT_AWAIT_CONFIRM:
         answer = message.strip().lower()
-        if answer in ("sí", "si", "s", "yes", "confirmo", "dale"):
+        if answer in (
+            "sí",
+            "si",
+            "s",
+            "yes",
+            "confirmo",
+            "dale",
+            "confirmar_si",
+            "✅ sí, confirmo",
+        ):
             conv.set_state(phone, CONTRACT_AWAIT_PAYMENT)
-            return (
-                "Perfecto. Para completar la contratación, seleccione el método de pago:\n\n"
-                "1. Transferencia bancaria\n"
-                "2. Tarjeta de crédito\n"
-                "3. Mercado Pago\n\n"
-                "Escriba el número de su preferencia:" + _CANCEL_HINT
+            return ButtonMessage(
+                body="Perfecto. Para completar la contratación, seleccioné el método de pago:",
+                buttons=[
+                    ReplyButton("pago_transferencia", "Transferencia"),
+                    ReplyButton("pago_tarjeta", "Tarjeta de crédito"),
+                    ReplyButton("pago_mercadopago", "Mercado Pago"),
+                ],
+                footer="_(Escribí *cancelar* para salir del proceso)_",
             )
-        elif answer in ("no", "n", "cancelar"):
+        elif answer in ("no", "n", "cancelar", "confirmar_no", "❌ no, cancelar"):
             conv.reset(phone)
             return "Contratación cancelada. ¿Puedo ayudarle con algo más?"
         else:
@@ -408,8 +470,18 @@ def handle_contract_plan(
             "1": "Transferencia bancaria",
             "2": "Tarjeta de crédito",
             "3": "Mercado Pago",
+            # IDs from interactive buttons
+            "pago_transferencia": "Transferencia bancaria",
+            "pago_tarjeta": "Tarjeta de crédito",
+            "pago_mercadopago": "Mercado Pago",
+            # Button titles (lowercase)
+            "transferencia": "Transferencia bancaria",
+            "tarjeta de crédito": "Tarjeta de crédito",
+            "mercado pago": "Mercado Pago",
         }
-        method = payment_methods.get(message.strip())
+        method = payment_methods.get(message.strip().lower()) or payment_methods.get(
+            message.strip()
+        )
         if not method:
             return "Opción no válida. Escriba 1, 2 o 3." + _CANCEL_HINT
 

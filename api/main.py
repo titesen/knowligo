@@ -42,6 +42,7 @@ from api.models import (
 )
 from rag.query.pipeline import RAGPipeline
 from agent.orchestrator import AgentOrchestrator
+from agent.messages import AgentResponse, ListMessage, ButtonMessage, to_text
 
 # Logging
 logging.basicConfig(
@@ -312,9 +313,16 @@ async def verify_webhook(
         raise HTTPException(status_code=403, detail="Verification failed")
 
 
-async def send_whatsapp_message(to: str, message: str, settings: Settings):
+async def send_whatsapp_message(
+    to: str, message: AgentResponse, settings: Settings
+):
     """
     Envía un mensaje de WhatsApp usando la Cloud API de Meta.
+
+    Acepta:
+    - str → se envía como mensaje de texto simple
+    - ListMessage → se envía como Interactive List (menú seleccionable)
+    - ButtonMessage → se envía como Reply Buttons (botones inline)
     """
     phone_number_id = settings.WHATSAPP_PHONE_NUMBER_ID
     whatsapp_token = settings.WHATSAPP_TOKEN
@@ -341,12 +349,27 @@ async def send_whatsapp_message(to: str, message: str, settings: Settings):
         "Authorization": f"Bearer {whatsapp_token}",
         "Content-Type": "application/json",
     }
-    payload = {
-        "messaging_product": "whatsapp",
-        "to": normalized_to,
-        "type": "text",
-        "text": {"body": message},
-    }
+
+    # Construir payload según tipo de mensaje
+    if isinstance(message, (ListMessage, ButtonMessage)):
+        payload = {
+            "messaging_product": "whatsapp",
+            "to": normalized_to,
+            "type": "interactive",
+            "interactive": message.to_whatsapp_payload(),
+        }
+        logger.info(
+            f"📋 Enviando mensaje interactivo ({type(message).__name__}) a {normalized_to}"
+        )
+    else:
+        # str o TextMessage → texto plano
+        body = to_text(message)
+        payload = {
+            "messaging_product": "whatsapp",
+            "to": normalized_to,
+            "type": "text",
+            "text": {"body": body},
+        }
 
     try:
         async with httpx.AsyncClient(timeout=15.0) as client:
@@ -413,20 +436,47 @@ async def handle_webhook(
                         logger.info(f"Mensaje duplicado ignorado: {msg_id}")
                         continue
 
-                    # Solo procesar mensajes de texto
-                    if message.get("type") != "text":
+                    msg_type = message.get("type")
+                    from_number = message["from"]
+
+                    # Extraer texto según tipo de mensaje
+                    if msg_type == "text":
+                        message_body = message.get("text", {}).get("body", "")
+                    elif msg_type == "interactive":
+                        # Interactive reply (list_reply o button_reply)
+                        interactive = message.get("interactive", {})
+                        reply_type = interactive.get("type")
+                        if reply_type == "list_reply":
+                            # El usuario eligió una opción de una Interactive List
+                            reply = interactive.get("list_reply", {})
+                            message_body = reply.get("id", reply.get("title", ""))
+                            logger.info(
+                                f"📋 List reply de {from_number}: "
+                                f"id={reply.get('id')}, title={reply.get('title')}"
+                            )
+                        elif reply_type == "button_reply":
+                            # El usuario tocó un Reply Button
+                            reply = interactive.get("button_reply", {})
+                            message_body = reply.get("id", reply.get("title", ""))
+                            logger.info(
+                                f"🔘 Button reply de {from_number}: "
+                                f"id={reply.get('id')}, title={reply.get('title')}"
+                            )
+                        else:
+                            logger.info(
+                                f"Tipo interactivo desconocido: {reply_type}"
+                            )
+                            continue
+                    else:
                         logger.info(
-                            f"Mensaje no-texto ignorado: tipo={message.get('type')}"
+                            f"Mensaje no soportado ignorado: tipo={msg_type}"
                         )
                         await send_whatsapp_message(
-                            message["from"],
+                            from_number,
                             "Disculpe, solo puedo procesar mensajes de texto.",
                             settings,
                         )
                         continue
-
-                    from_number = message["from"]
-                    message_body = message.get("text", {}).get("body", "")
 
                     logger.info(f"Mensaje de {from_number}: {message_body}")
 

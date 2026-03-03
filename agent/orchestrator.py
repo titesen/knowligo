@@ -29,6 +29,15 @@ from agent.handlers import (
     start_create_ticket,
     start_registration,
 )
+from agent.messages import (
+    AgentResponse,
+    ButtonMessage,
+    ListMessage,
+    ListRow,
+    ListSection,
+    ReplyButton,
+    to_text,
+)
 from agent.router import AgentIntent, IntentRouter
 
 logger = logging.getLogger(__name__)
@@ -75,9 +84,12 @@ class AgentOrchestrator:
 
     # Entry point
 
-    def process_message(self, raw_phone: str, message: str) -> str:
+    def process_message(self, raw_phone: str, message: str) -> AgentResponse:
         """
-        Procesa un mensaje entrante y devuelve la respuesta como texto.
+        Procesa un mensaje entrante y devuelve la respuesta.
+
+        Retorna str para la mayoría de respuestas, o un objeto
+        ListMessage/ButtonMessage para respuestas interactivas de WhatsApp.
 
         Args:
             raw_phone: Número tal cual viene de WhatsApp (ej: '5493794285297')
@@ -137,10 +149,25 @@ class AgentOrchestrator:
             self._log_interaction(phone, message, "CASUAL", resp)
             return resp
 
+        # 4a. Map interactive button/list IDs to keywords
+        #     (when user taps an option in WhatsApp, the webhook sends the row id)
+        _INTERACTIVE_ID_MAP = {
+            "ver_planes": "ver planes",
+            "crear_ticket": "crear ticket",
+            "ver_tickets": "ver mis tickets",
+            "contratar_plan": "contratar plan",
+            "mi_cuenta": "mi cuenta",
+            "consultar": "consultar",
+            "registrarme": "registrarme",
+        }
+        if lower_msg in _INTERACTIVE_ID_MAP:
+            message = _INTERACTIVE_ID_MAP[lower_msg]
+            lower_msg = message.lower()
+
         # 4b. Intercept menu keyword
         if lower_msg in ("menú", "menu", "opciones", "ayuda", "help"):
             resp = self._build_menu(client)
-            self._log_interaction(phone, message, "MENU", resp)
+            self._log_interaction(phone, message, "MENU", to_text(resp))
             return resp
 
         # 5. Intercept "registrar" keyword before LLM routing
@@ -178,7 +205,7 @@ class AgentOrchestrator:
             phone,
             message,
             intent.value if hasattr(intent, "value") else str(intent),
-            resp,
+            to_text(resp),
         )
         return resp
 
@@ -191,7 +218,7 @@ class AgentOrchestrator:
         client: Optional[Dict],
         state: str,
         context: Dict,
-    ) -> str:
+    ) -> AgentResponse:
         """Continúa un flujo multi-turn en curso."""
 
         # Flujo de registro (no requiere client)
@@ -233,7 +260,7 @@ class AgentOrchestrator:
         client: Optional[Dict],
         intent: AgentIntent,
         conversation_history: list[dict] | None = None,
-    ) -> str:
+    ) -> AgentResponse:
         """Despacha según la intención clasificada."""
 
         # Intenciones que NO requieren estar registrado
@@ -352,11 +379,13 @@ class AgentOrchestrator:
             return True
         return False
 
-    def _handle_saludo(self, client: Optional[Dict], phone: str) -> str:
+    def _handle_saludo(self, client: Optional[Dict], phone: str) -> AgentResponse:
         """Genera un saludo variado usando el LLM + menú adaptativo.
 
         Si el usuario interactuó hace menos de 30 minutos, omite el saludo
         largo y devuelve un mensaje breve con menú.
+
+        Retorna un ListMessage con el menú interactivo de WhatsApp.
         """
         # Smart greeting recency
         last_time = self._db.get_last_interaction_time(phone)
@@ -364,7 +393,14 @@ class AgentOrchestrator:
             minutes_ago = (datetime.now() - last_time).total_seconds() / 60
             if minutes_ago < 30:
                 menu = self._build_menu(client)
-                return f"¡De vuelta! ¿En qué puedo ayudarte?\n\n{menu}"
+                menu = ListMessage(
+                    body="¡De vuelta! ¿En qué puedo ayudarte?",
+                    button_text=menu.button_text,
+                    sections=menu.sections,
+                    header=menu.header,
+                    footer=menu.footer,
+                )
+                return menu
 
         if client:
             name = client["contact_name"]
@@ -385,33 +421,95 @@ class AgentOrchestrator:
             )
 
         menu = self._build_menu(client)
-        return f"{greeting}\n\n{menu}"
+        menu = ListMessage(
+            body=greeting,
+            button_text=menu.button_text,
+            sections=menu.sections,
+            header=menu.header,
+            footer=menu.footer,
+        )
+        return menu
 
-    def _build_menu(self, client: Optional[Dict]) -> str:
-        """Construye un menú adaptativo según si el usuario es cliente o no."""
+    def _build_menu(self, client: Optional[Dict]) -> ListMessage:
+        """Construye un menú interactivo adaptativo según si el usuario es cliente o no.
+
+        Retorna un ListMessage que:
+        - En WhatsApp → se envía como Interactive List nativa (tap to select)
+        - En /query o tests → se serializa a texto plano con .to_text()
+        """
         if client:
             name = client["contact_name"]
-            return (
-                f"📌 *Menú de opciones — {name}*\n"
-                "━━━━━━━━━━━━━━━━━━━━\n"
-                "📋 *Ver planes* — Conocé nuestros planes\n"
-                "📩 *Crear ticket* — Reportá un problema\n"
-                "📝 *Ver mis tickets* — Consultá tus incidencias\n"
-                "💳 *Contratar plan* — Suscribite a un plan\n"
-                "👤 *Mi cuenta* — Consultá tu información\n"
-                "💬 *Consultar* — Preguntame lo que necesites\n"
-                "━━━━━━━━━━━━━━━━━━━━\n"
-                "Escribí la opción o tu consulta directamente."
+            return ListMessage(
+                body="¿En qué puedo ayudarte?",
+                button_text="Ver opciones",
+                header=f"Menú de opciones — {name}",
+                footer="Escribí la opción o tu consulta directamente.",
+                sections=[
+                    ListSection(
+                        title="Servicios",
+                        rows=[
+                            ListRow(
+                                "ver_planes", "Ver planes", "Conocé nuestros planes"
+                            ),
+                            ListRow(
+                                "consultar", "Consultar", "Preguntame lo que necesites"
+                            ),
+                        ],
+                    ),
+                    ListSection(
+                        title="Soporte",
+                        rows=[
+                            ListRow(
+                                "crear_ticket", "Crear ticket", "Reportá un problema"
+                            ),
+                            ListRow(
+                                "ver_tickets",
+                                "Ver mis tickets",
+                                "Consultá tus incidencias",
+                            ),
+                        ],
+                    ),
+                    ListSection(
+                        title="Cuenta",
+                        rows=[
+                            ListRow(
+                                "mi_cuenta", "Mi cuenta", "Consultá tu información"
+                            ),
+                            ListRow(
+                                "contratar_plan",
+                                "Contratar plan",
+                                "Suscribite a un plan",
+                            ),
+                        ],
+                    ),
+                ],
             )
         else:
-            return (
-                "📌 *Menú de opciones*\n"
-                "━━━━━━━━━━━━━━━━━━━━\n"
-                "📝 *Registrarme* — Darme de alta como cliente\n"
-                "📋 *Ver planes* — Conocé nuestros planes\n"
-                "💬 *Consultar* — Preguntame sobre nuestros servicios\n"
-                "━━━━━━━━━━━━━━━━━━━━\n"
-                "Escribí la opción o tu consulta directamente."
+            return ListMessage(
+                body="¿En qué puedo ayudarte?",
+                button_text="Ver opciones",
+                header="Menú de opciones",
+                footer="Escribí la opción o tu consulta directamente.",
+                sections=[
+                    ListSection(
+                        title="Opciones",
+                        rows=[
+                            ListRow(
+                                "registrarme",
+                                "Registrarme",
+                                "Darme de alta como cliente",
+                            ),
+                            ListRow(
+                                "ver_planes", "Ver planes", "Conocé nuestros planes"
+                            ),
+                            ListRow(
+                                "consultar",
+                                "Consultar",
+                                "Preguntame sobre nuestros servicios",
+                            ),
+                        ],
+                    ),
+                ],
             )
 
     def _is_gibberish(self, text: str) -> bool:

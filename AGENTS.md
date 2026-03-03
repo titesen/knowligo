@@ -19,7 +19,7 @@
 ## 2. Contrato de Validación (Build & Test)
 
 ```powershell
-# Ejecutar TODOS los tests (119 tests, debe dar 0 failures)
+# Ejecutar TODOS los tests (145 tests, debe dar 0 failures)
 py -3.11 -m pytest tests/ -v --tb=short
 
 # Solo tests rápidos (sin cargar modelos ML)
@@ -150,7 +150,8 @@ Consultar `docs/adr/` para el razonamiento detrás de decisiones clave:
 tests/
 ├── conftest.py           → Fixtures: test_settings, mock_pipeline, mock_orchestrator, client
 ├── test_api.py           → Endpoints HTTP (200, 400, 404, 422, 429)
-├── test_orchestrator.py  → 53 tests: flujos completos del agente
+├── test_orchestrator.py  → 55 tests: flujos completos del agente
+├── test_messages.py      → 25 tests: mensajes interactivos WhatsApp (payloads, tipos, IDs)
 ├── test_db_service.py    → CRUD: clients, tickets, contracts, payments
 ├── test_conversation.py  → Máquina de estados
 ├── test_intent.py        → Clasificador de intenciones
@@ -158,7 +159,7 @@ tests/
 ├── test_validator.py     → Validación de dominio + prompt injection
 ```
 
-Total: **119 tests** · Tiempo: ~21s (carga modelo de embeddings)
+Total: **145 tests** · Tiempo: ~37s (carga modelo de embeddings)
 
 ---
 

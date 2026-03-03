@@ -16,6 +16,7 @@ sys.path.insert(0, str(project_root))
 
 from agent.orchestrator import AgentOrchestrator, normalize_phone
 from agent.router import AgentIntent
+from agent.messages import to_text, ListMessage, ButtonMessage
 
 _SCHEMA_PATH = project_root / "database" / "schema" / "schema.sql"
 _SEED_PATH = project_root / "database" / "seeds" / "seed.sql"
@@ -95,11 +96,12 @@ class TestOrchestratorSaludo:
             "confidence": 0.95,
         }
         resp = orchestrator.process_message("5493794285297", "Hola")
+        text = to_text(resp)
         # Debe incluir menú con opciones de cliente registrado
-        assert "Menú de opciones" in resp
-        assert "Ver planes" in resp
-        assert "Crear ticket" in resp
-        assert "Mi cuenta" in resp
+        assert "Menú de opciones" in text
+        assert "Ver planes" in text
+        assert "Crear ticket" in text
+        assert "Mi cuenta" in text
 
     def test_saludo_unregistered_client(self, orchestrator):
         """Saludo de número desconocido devuelve saludo + menú reducido."""
@@ -108,13 +110,23 @@ class TestOrchestratorSaludo:
             "confidence": 0.95,
         }
         resp = orchestrator.process_message("5491199990000", "Hola")
+        text = to_text(resp)
         # Debe incluir menú con opciones de no-registrado
-        assert "Menú de opciones" in resp
-        assert "Registrarme" in resp
-        assert "Ver planes" in resp
+        assert "Menú de opciones" in text
+        assert "Registrarme" in text
+        assert "Ver planes" in text
         # NO debe incluir opciones de registrado
-        assert "Mi cuenta" not in resp
-        assert "Crear ticket" not in resp
+        assert "Mi cuenta" not in text
+        assert "Crear ticket" not in text
+
+    def test_saludo_returns_list_message(self, orchestrator):
+        """Saludo retorna ListMessage para WhatsApp interactivo."""
+        orchestrator._mock_router.classify.return_value = {
+            "intent": AgentIntent.SALUDO,
+            "confidence": 0.95,
+        }
+        resp = orchestrator.process_message("5493794285297", "Hola")
+        assert isinstance(resp, ListMessage)
 
 
 class TestOrchestratorRegistration:
@@ -155,7 +167,7 @@ class TestOrchestratorRegistration:
         }
         resp = orchestrator.process_message(phone, "Hola")
         # Con LLM real mencionaría Juan; menú incluye opciones de registrado
-        assert "Menú de opciones" in resp
+        assert "Menú de opciones" in to_text(resp)
 
 
 class TestOrchestratorTickets:
@@ -195,11 +207,13 @@ class TestOrchestratorTickets:
             phone,
             "La VPN corporativa no conecta desde hoy a la mañana, da error de timeout",
         )
-        assert "prioridad" in resp.lower()
+        text = to_text(resp)
+        assert "prioridad" in text.lower()
 
         resp = orchestrator.process_message(phone, "Alta")
-        assert "ticket" in resp.lower()
-        assert "#" in resp
+        text = to_text(resp)
+        assert "ticket" in text.lower()
+        assert "#" in text
 
 
 class TestOrchestratorPlanes:
@@ -344,8 +358,9 @@ class TestSinglePlanEnforcement:
             "confidence": 0.9,
         }
         resp = orchestrator.process_message("5493794285297", "Quiero contratar")
+        text = to_text(resp)
         # Debe mostrar los planes disponibles
-        assert "Básico" in resp or "plan" in resp.lower()
+        assert "Básico" in text or "plan" in text.lower()
 
 
 class TestOrchestratorFueraDeTema:
@@ -441,28 +456,34 @@ class TestAdaptiveMenu:
     def test_menu_keyword_registered(self, orchestrator):
         """Escribir 'menú' devuelve menú sin pasar por el router."""
         resp = orchestrator.process_message("5493794285297", "menú")
-        assert "Menú de opciones" in resp
-        assert "Crear ticket" in resp
-        assert "Mi cuenta" in resp
+        assert isinstance(resp, ListMessage)
+        text = to_text(resp)
+        assert "Menú de opciones" in text
+        assert "Crear ticket" in text
+        assert "Mi cuenta" in text
         # Router no debe haber sido llamado
         orchestrator._mock_router.classify.assert_not_called()
 
     def test_menu_keyword_unregistered(self, orchestrator):
         """Escribir 'menú' sin estar registrado muestra menú reducido."""
         resp = orchestrator.process_message("5491199990000", "menú")
-        assert "Menú de opciones" in resp
-        assert "Registrarme" in resp
-        assert "Crear ticket" not in resp
+        assert isinstance(resp, ListMessage)
+        text = to_text(resp)
+        assert "Menú de opciones" in text
+        assert "Registrarme" in text
+        assert "Crear ticket" not in text
 
     def test_menu_keyword_opciones(self, orchestrator):
         """'opciones' también activa el menú."""
         resp = orchestrator.process_message("5493794285297", "opciones")
-        assert "Menú de opciones" in resp
+        assert isinstance(resp, ListMessage)
+        assert "Menú de opciones" in to_text(resp)
 
     def test_menu_keyword_ayuda(self, orchestrator):
         """'ayuda' también activa el menú."""
         resp = orchestrator.process_message("5493794285297", "ayuda")
-        assert "Menú de opciones" in resp
+        assert isinstance(resp, ListMessage)
+        assert "Menú de opciones" in to_text(resp)
 
 
 # Gibberish Detection
@@ -587,8 +608,9 @@ class TestGreetingRecency:
         }
         # Primer saludo: full menu
         resp1 = orchestrator.process_message(phone, "Hola")
-        assert "Menú de opciones" in resp1
+        assert "Menú de opciones" in to_text(resp1)
 
         # Segundo saludo inmediato: should be short + menu
         resp2 = orchestrator.process_message(phone, "Hola")
-        assert "De vuelta" in resp2 or "menú" in resp2.lower()
+        text2 = to_text(resp2)
+        assert "De vuelta" in text2 or "menú" in text2.lower()
