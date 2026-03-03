@@ -17,9 +17,11 @@ import numpy as np
 try:
     from sentence_transformers import SentenceTransformer
     import faiss
-except ImportError:
-    print("⚠️  Dependencias no instaladas. Ejecuta: pip install -r requirements.txt")
-    exit(1)
+except ImportError as e:
+    raise ImportError(
+        "Dependencias no instaladas (sentence-transformers, faiss-cpu). "
+        "Ejecuta: pip install -r requirements.txt"
+    ) from e
 
 try:
     from rank_bm25 import BM25Okapi

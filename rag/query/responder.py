@@ -14,9 +14,10 @@ from typing import List, Dict, Optional
 
 try:
     from groq import Groq
-except ImportError:
-    print("⚠️  Dependencias no instaladas. Ejecuta: pip install groq")
-    exit(1)
+except ImportError as e:
+    raise ImportError(
+        "Dependencia no instalada (groq). Ejecuta: pip install groq"
+    ) from e
 
 logger = logging.getLogger(__name__)
 

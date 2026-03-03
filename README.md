@@ -4,9 +4,21 @@
 
 [![Python](https://img.shields.io/badge/Python-3.11+-blue.svg)](https://python.org)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-green.svg)](https://fastapi.tiangolo.com)
+[![Tests](https://img.shields.io/badge/Tests-119_passing-brightgreen.svg)](tests/)
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-## 📋 Descripción
+## � Documentación
+
+| Documento | Audiencia | Descripción |
+|-----------|-----------|-------------|
+| [AGENTS.md](AGENTS.md) | 🤖 AI Agents | Contexto completo para coding agents — arquitectura, reglas, patrones |
+| [docs/INDEX.md](docs/INDEX.md) | 👤 Todos | Índice principal de toda la documentación |
+| [docs/diagrams/](docs/diagrams/architecture.md) | 👤 Todos | Diagramas Mermaid — C4, ERD, pipeline RAG, máquina de estados |
+| [docs/adr/](docs/adr/) | 🏗️ Arquitectos | Decisiones arquitectónicas (SQLite, FAISS+BM25, Groq, webhook) |
+| [docs/PRD.md](docs/PRD.md) | 📋 Product | Product Requirements Document completo |
+| [llms.txt](llms.txt) | 🤖 AI Agents | Índice legible por máquina (estándar llms.txt) |
+
+## �📋 Descripción
 
 KnowLigo es una empresa ficticia de soporte IT para PyMEs. Este proyecto implementa un agente conversacional que:
 
@@ -23,27 +35,31 @@ KnowLigo es una empresa ficticia de soporte IT para PyMEs. Este proyecto impleme
 
 ## 🏗️ Arquitectura
 
+```mermaid
+graph TB
+    User["👤 Usuario<br>(WhatsApp)"] -->|Mensaje| Meta["☁️ Meta<br>WhatsApp Cloud API"]
+    Meta -->|Webhook POST /webhook| API["🖥️ FastAPI<br>api/main.py"]
+    API --> ORC["AgentOrchestrator<br>orchestrator.py"]
+    ORC --> ID["Identificación<br>por teléfono"]
+    ORC --> CNV["Conversation Manager<br>máquina de estados"]
+    ORC --> RTR["LLM Intent Router<br>(Groq)"]
+    ORC --> HND["Handlers multi-turn<br>registro · tickets · contratos"]
+    ORC --> RAG["RAG Pipeline"]
+    RAG --> VAL["Validator<br>topic + prompt injection"]
+    RAG --> RET["Retriever<br>FAISS + BM25 + RRF"]
+    RAG --> RRK["Reranker<br>Cross-Encoder"]
+    RAG --> CAC["Semantic Cache"]
+    RAG --> RSP["Responder<br>Groq LLM"]
+    ORC -->|Respuesta| API
+    API -->|POST /messages| Meta
+    Meta -->|Respuesta| User
+
+    style API fill:#2196F3,color:#fff
+    style ORC fill:#4CAF50,color:#fff
+    style RAG fill:#FF9800,color:#fff
 ```
-Usuario (WhatsApp)
-    ↓
-FastAPI /webhook (api/main.py)
-    ↓
-AgentOrchestrator (agent/orchestrator.py)
-    ├── Identificación por teléfono (DB lookup)
-    ├── Conversation Manager (máquina de estados)
-    ├── LLM Intent Router (Groq) → clasifica intención
-    ├── Handlers multi-turn:
-    │   ├── Registro de usuario
-    │   ├── Crear ticket
-    │   └── Contratar plan + pago mock
-    └── RAG Pipeline → consultas informativas
-         ├── Validator (topic control + prompt injection)
-         ├── Retriever (FAISS + Cross-Encoder reranking)
-         ├── Semantic Cache
-         └── Responder (Groq LLM)
-    ↓
-Respuesta → WhatsApp
-```
+
+> 📐 Diagramas detallados (C4, ERD, pipeline RAG, máquina de estados) en [docs/diagrams/architecture.md](docs/diagrams/architecture.md)
 
 ## 🚀 Quick Start
 
@@ -156,7 +172,7 @@ knowligo/
 │   │                      #   tickets, conversations, payments)
 │   ├── seeds/             # Datos de prueba
 │   └── sqlite/            # Base de datos
-├── tests/                 # Tests con pytest (79 tests)
+├── tests/                 # Tests con pytest (119 tests)
 │   ├── test_api.py        # Tests de endpoints FastAPI
 │   ├── test_orchestrator.py # Tests del agente (flujos completos)
 │   ├── test_db_service.py # Tests de capa de datos
@@ -210,7 +226,7 @@ curl -X POST http://localhost:8000/query `
 ### Tests unitarios con pytest
 
 ```powershell
-# Ejecutar todos los tests (79 tests)
+# Ejecutar todos los tests (119 tests)
 python -m pytest tests/ -v
 
 # Tests específicos
@@ -317,7 +333,7 @@ LLM_MODEL=llama-3.3-70b-versatile
 - [x] **Registro de usuarios, creación de tickets, contratación de planes**
 - [x] **Pagos mock y sistema de contratos**
 - [x] **LLM Router para clasificación de intenciones**
-- [x] Tests unitarios con pytest (79 tests)
+- [x] Tests unitarios con pytest (119 tests)
 - [ ] Monitoreo con Prometheus/Grafana
 - [ ] Frontend web para administración
 - [ ] Soporte para múltiples idiomas

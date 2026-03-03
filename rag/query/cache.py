@@ -20,7 +20,8 @@ try:
     from sentence_transformers import SentenceTransformer
     import faiss
 except ImportError:
-    print("⚠️  Dependencias no instaladas para cache semántico.")
+    SentenceTransformer = None  # graceful degradation — cache deshabilitado
+    faiss = None
 
 logger = logging.getLogger(__name__)
 

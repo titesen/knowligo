@@ -1,0 +1,62 @@
+# KnowLigo
+
+> RAG-powered IT support chatbot for WhatsApp — Python 3.11, FastAPI, FAISS, Groq LLM, SQLite
+
+## Documentation
+
+- [AGENTS.md](/AGENTS.md): Full context for AI coding agents — architecture, rules, patterns, boundaries
+- [README.md](/README.md): Main documentation — quick start, endpoints, configuration, testing
+- [docs/PRD.md](/docs/PRD.md): Product Requirements Document — goals, users, features, metrics
+- [docs/diagrams/architecture.md](/docs/diagrams/architecture.md): Mermaid diagrams — C4, message flow, RAG pipeline, ERD, state machine
+
+## Architecture Decisions
+
+- [ADR-001](/docs/adr/ADR-001-sqlite-over-postgresql.md): SQLite over PostgreSQL — zero dependencies, single-file DB
+- [ADR-002](/docs/adr/ADR-002-faiss-bm25-hybrid-retrieval.md): Hybrid FAISS + BM25 retrieval with RRF fusion
+- [ADR-003](/docs/adr/ADR-003-groq-free-tier-llm.md): Groq API free tier as LLM provider — $0 cost, 300ms latency
+- [ADR-004](/docs/adr/ADR-004-direct-webhook-over-n8n.md): Direct FastAPI webhook over n8n middleware
+
+## API Reference
+
+- OpenAPI spec: GET /docs (Swagger UI) or GET /redoc (ReDoc)
+- POST /webhook: WhatsApp Business webhook (receive/send messages)
+- POST /query: Process a user query through the RAG pipeline
+- GET /health: System health check (DB, FAISS index, Groq API)
+- GET /stats: Usage statistics (queries, intents, users)
+
+## Knowledge Base (RAG source documents)
+
+- [company.md](/knowledge/documents/company.md): Company information
+- [plans.md](/knowledge/documents/plans.md): Service plans (Basic, Professional, Enterprise)
+- [services.md](/knowledge/documents/services.md): IT support services
+- [sla.md](/knowledge/documents/sla.md): Service Level Agreements
+- [policies.md](/knowledge/documents/policies.md): Company policies
+- [faq.md](/knowledge/documents/faq.md): Frequently asked questions
+
+## Source Code Map
+
+- api/main.py: FastAPI endpoints + WhatsApp webhook
+- api/config.py: Centralized Pydantic BaseSettings
+- api/models.py: Request/Response Pydantic schemas (RFC 7807 errors)
+- agent/orchestrator.py: Main conversational agent orchestrator
+- agent/router.py: LLM-based intent classification (10 intents)
+- agent/handlers.py: Multi-turn flow handlers (registration, tickets, contracts)
+- agent/conversation.py: Per-phone state machine
+- agent/db_service.py: SQLite data access layer
+- rag/query/pipeline.py: RAG pipeline — rate limit → cache → validate → retrieve → rerank → respond
+- rag/query/retriever.py: Hybrid FAISS + BM25 retrieval with RRF fusion
+- rag/query/responder.py: Groq LLM response generation
+- rag/query/reranker.py: Cross-Encoder reranking (ms-marco-MiniLM-L-6-v2)
+- rag/query/cache.py: Semantic FAISS cache (threshold 0.92, TTL 3600s)
+- rag/query/validator.py: Domain validation + prompt injection detection
+
+## Tech Stack
+
+- Python 3.11, FastAPI 0.115, Pydantic 2.9, pydantic-settings 2.12
+- Groq API (Llama 3.3 70B Versatile) — free tier, ~300ms latency
+- FAISS (facebook/faiss-cpu) + BM25 (rank-bm25) — hybrid retrieval
+- Sentence Transformers (paraphrase-multilingual-MiniLM-L12-v2, 384-dim)
+- Cross-Encoder (ms-marco-MiniLM-L-6-v2) — reranking
+- SQLite 3 — embedded database
+- Docker + docker-compose — containerized deployment
+- 119 pytest tests — unit + integration
