@@ -4,7 +4,7 @@
 
 [![Python](https://img.shields.io/badge/Python-3.11+-blue.svg)](https://python.org)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-green.svg)](https://fastapi.tiangolo.com)
-[![Tests](https://img.shields.io/badge/Tests-119_passing-brightgreen.svg)](tests/)
+[![Tests](https://img.shields.io/badge/Tests-145_passing-brightgreen.svg)](tests/)
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 ## � Documentación
@@ -18,7 +18,24 @@
 | [docs/PRD.md](docs/PRD.md) | 📋 Product | Product Requirements Document completo |
 | [llms.txt](llms.txt) | 🤖 AI Agents | Índice legible por máquina (estándar llms.txt) |
 
-## �📋 Descripción
+## 📋 Descripción
+
+### Stack Tecnológico
+
+| Categoría | Tecnología | Versión | Propósito |
+|-----------|-----------|---------|-----------|
+| **Runtime** | Python | 3.11+ | Lenguaje principal |
+| **Web Framework** | FastAPI | 0.115.0 | API REST + webhook WhatsApp |
+| **Validation** | Pydantic | 2.9.2 | Schemas, settings, DTOs |
+| **LLM** | Groq API | 0.11.0 | Llama 3.3 70B Versatile (free tier) |
+| **Vector Search** | FAISS (cpu) | 1.13.2 | Búsqueda semántica densa |
+| **Sparse Search** | rank-bm25 | 0.2.2 | Búsqueda léxica BM25 |
+| **Embeddings** | Sentence Transformers | 3.3.1 | `paraphrase-multilingual-MiniLM-L12-v2` (384-dim) |
+| **Reranking** | Cross-Encoder | 3.3.1 | `ms-marco-MiniLM-L-6-v2` |
+| **Database** | SQLite | 3 (built-in) | Datos transaccionales |
+| **HTTP Client** | httpx | 0.27.2 | WhatsApp Cloud API calls |
+| **Deployment** | Docker + Compose | — | Containerización |
+| **Testing** | pytest | 8.3.5 | 145 tests (unit + integration) |
 
 KnowLigo es una empresa ficticia de soporte IT para PyMEs. Este proyecto implementa un agente conversacional que:
 
@@ -30,6 +47,7 @@ KnowLigo es una empresa ficticia de soporte IT para PyMEs. Este proyecto impleme
 - ✅ Muestra **estado de cuenta** y **tickets abiertos** del cliente
 - ✅ Genera respuestas naturales con **Groq API** (Llama 3.3 70B)
 - ✅ Integra con **WhatsApp Business API** vía webhook directo en FastAPI
+- ✅ **UI interactiva de WhatsApp** con menús (Interactive Lists) y botones (Reply Buttons)
 - ✅ Controla respuestas on-topic, rate limiting y abuse prevention
 - ✅ 100% gratuito (usa APIs free tier)
 
@@ -142,6 +160,7 @@ knowligo/
 │   ├── orchestrator.py    # Orquestador principal (entry point)
 │   ├── router.py          # Clasificación de intención con LLM
 │   ├── handlers.py        # Lógica de flujos multi-turn
+│   ├── messages.py        # Mensajes interactivos WhatsApp (List, Buttons)
 │   ├── conversation.py    # Máquina de estados por teléfono
 │   └── db_service.py      # Capa de acceso a datos
 ├── api/                    # FastAPI application
@@ -175,6 +194,7 @@ knowligo/
 ├── tests/                 # Tests con pytest (145 tests)
 │   ├── test_api.py        # Tests de endpoints FastAPI
 │   ├── test_orchestrator.py # Tests del agente (flujos completos)
+│   ├── test_messages.py   # Tests de mensajes interactivos WhatsApp
 │   ├── test_db_service.py # Tests de capa de datos
 │   ├── test_conversation.py # Tests de máquina de estados
 │   ├── test_intent.py     # Tests de clasificación

@@ -89,21 +89,7 @@ Copia la URL HTTPS (ej: `https://abc123.ngrok-free.app`)
 
 ---
 
-## 🎥 Elementos para Demo en Video
-
-### Mostrar en el video:
-
-1. **Arquitectura** (diagrama del README)
-2. **Swagger UI** (http://localhost:8000/docs)
-   - Ejecutar query manualmente
-3. **WhatsApp en vivo**:
-   - Enviar: "¿Qué planes ofrecen?"
-   - Enviar: "¿Cuál es el SLA para tickets High?"
-   - Enviar: "Dame consejos de hacking" (debe rechazar)
-4. **Tests** (`python -m pytest tests/ -v`)
-5. **Stats endpoint** (http://localhost:8000/stats)
-
-### Queries de ejemplo para demo:
+### Queries de ejemplo:
 
 ✅ **Válidas**:
 - "¿Qué planes de soporte ofrecen?"
@@ -164,9 +150,8 @@ docker-compose logs -f api
 [ ] Webhook verificado en Meta ✅
 [ ] Tu número agregado en Meta
 [ ] Mensaje de prueba enviado → respuesta recibida ✅
-[ ] Cámara/screen recorder listos 🎥
 ```
 
 ---
 
-¡Listo para grabar! 🚀
+¡Listo para usar! 🚀

@@ -1,11 +1,4 @@
-# =============================================================================
-# Multi-stage Dockerfile para KnowLigo RAG API
-# Optimizado para tamaño mínimo y máxima eficiencia
-# =============================================================================
-
-# -----------------------------------------------------------------------------
 # Stage 1: Builder - Instala dependencias
-# -----------------------------------------------------------------------------
 FROM python:3.11-slim-bookworm AS builder
 
 WORKDIR /build
@@ -36,7 +29,7 @@ RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
     pip install --no-cache-dir \
         # Web framework (ligero, instalar primero)
         fastapi==0.115.0 \
-        uvicorn[standard]==0.30.6 \
+        uvicorn[standard]==0.32.1 \
         pydantic==2.9.2 \
         pydantic-settings==2.12.0 \
         requests==2.32.3 \
@@ -54,9 +47,8 @@ RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
     find /opt/venv -type f -name '*.pyo' -delete && \
     find /opt/venv -type d -name '*.dist-info' -exec sh -c 'rm -rf "$1"/{RECORD,WHEEL,INSTALLER}' _ {} \; 2>/dev/null || true
 
-# -----------------------------------------------------------------------------
+
 # Stage 2: Runtime - Imagen final mínima
-# -----------------------------------------------------------------------------
 FROM python:3.11-slim-bookworm AS runtime
 
 # Metadata
@@ -90,6 +82,7 @@ RUN groupadd -r knowligo && useradd -r -g knowligo -u 1001 knowligo && \
 COPY --chown=knowligo:knowligo database/ ./database/
 COPY --chown=knowligo:knowligo knowledge/ ./knowledge/
 COPY --chown=knowligo:knowligo rag/ ./rag/
+COPY --chown=knowligo:knowligo agent/ ./agent/
 COPY --chown=knowligo:knowligo api/ ./api/
 
 # Cambiar a usuario non-root

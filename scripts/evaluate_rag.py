@@ -28,9 +28,7 @@ load_dotenv(project_root / ".env")
 from groq import Groq
 
 
-# ============================================================================
 # Configuración
-# ============================================================================
 EVAL_DATASET_PATH = Path(__file__).parent / "eval_dataset.json"
 RESULTS_DIR = Path(__file__).parent / "eval_results"
 
@@ -39,9 +37,9 @@ GROQ_MODEL = os.getenv("LLM_MODEL", "llama-3.3-70b-versatile")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 
 
-# ============================================================================
 # LLM Judge
-# ============================================================================
+
+
 class LLMJudge:
     """Usa Groq LLM como juez para evaluar respuestas del RAG."""
 
@@ -182,9 +180,9 @@ Responde SOLO con JSON: {{"score": float, "reason": "explicación breve"}}"""
             return {"score": 0.5, "reason": f"Error parseando: {result[:100]}"}
 
 
-# ============================================================================
 # Evaluador Principal
-# ============================================================================
+
+
 class RAGEvaluator:
     """Ejecuta la evaluación completa del sistema RAG."""
 
@@ -417,9 +415,7 @@ class RAGEvaluator:
             return "🔴 Bajo"
 
 
-# ============================================================================
 # Main
-# ============================================================================
 if __name__ == "__main__":
     import argparse
 

@@ -1,6 +1,6 @@
 # KnowLigo — Documentación del Proyecto
 
-> Índice principal para agentes de IA y humanos.  
+> Índice principal.  
 > Cada línea: descripción breve + ruta al archivo.
 
 ## Contexto del Proyecto
@@ -40,6 +40,7 @@
 - `agent/handlers.py`: Lógica de flujos multi-turn (registro, tickets, contratos)
 - `agent/conversation.py`: Máquina de estados por teléfono
 - `agent/db_service.py`: Capa de acceso a datos SQLite
+- `agent/messages.py`: Mensajes interactivos WhatsApp (TextMessage, ListMessage, ButtonMessage)
 - `rag/query/pipeline.py`: Pipeline RAG — rate limit, cache, retrieve, rerank, respond
 - `rag/query/retriever.py`: FAISS + BM25 hybrid retrieval con RRF fusion
 - `rag/query/responder.py`: Generación de respuestas con Groq LLM

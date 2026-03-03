@@ -13,7 +13,7 @@ graph TB
     API["🖥️ KnowLigo API<br>FastAPI + Uvicorn"]
     Groq["🤖 Groq Cloud<br>Llama 3.3 70B"]
 
-    User -->|Mensaje de texto| Meta
+    User -->|Mensaje texto/interactivo| Meta
     Meta -->|Webhook POST /webhook| API
     API -->|Chat Completions API| Groq
     Groq -->|Respuesta generada| API
@@ -42,6 +42,7 @@ graph TB
         ORC["AgentOrchestrator<br>orchestrator.py"]
         RTR["IntentRouter<br>router.py (LLM)"]
         HND["Handlers<br>handlers.py"]
+        MSG["Messages<br>messages.py"]
         CNV["ConversationManager<br>conversation.py"]
         DBS["DBService<br>db_service.py"]
     end
@@ -66,6 +67,7 @@ graph TB
     EP --> ORC
     ORC --> RTR
     ORC --> HND
+    HND --> MSG
     ORC --> CNV
     ORC --> DBS
     ORC --> PIP
@@ -92,9 +94,11 @@ graph TB
 
 ```mermaid
 flowchart TD
-    A["📩 Mensaje WhatsApp"] --> B{Tipo texto?}
-    B -->|No| B1["Responder: solo proceso texto"]
-    B -->|Sí| C{Duplicado?}
+    A["📩 Mensaje WhatsApp"] --> B{Tipo texto o\ninteractive?}
+    B -->|Otro| B1["Responder: tipo no soportado"]
+    B -->|Texto| C{Duplicado?}
+    B -->|Interactive| B2["Extraer list_reply.id\no button_reply.id"]
+    B2 --> C
     C -->|Sí| C1["Ignorar (dedup 5min)"]
     C -->|No| D["Normalizar teléfono"]
     D --> E["Buscar cliente por phone"]

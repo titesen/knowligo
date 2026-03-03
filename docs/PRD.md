@@ -89,8 +89,9 @@ User Query → Validation → Intent → Retrieval → LLM Response → WhatsApp
 - Gestión de sesiones de usuario
 
 **Capacidades:**
-- Recepción de mensajes de texto
-- Envío de respuestas con formato
+- Recepción de mensajes de texto e interactivos (list_reply, button_reply)
+- Envío de respuestas con formato de texto
+- Envío de mensajes interactivos (Interactive Lists, Reply Buttons)
 - Manejo de multimedia (limitado en MVP)
 
 #### 3. Control de Uso y Abuse Prevention
@@ -673,7 +674,7 @@ knowligo/
 - [x] API REST con FastAPI
 - [x] Docker Compose deployment
 - [x] Documentación inicial
-- [x] Tests unitarios con pytest (38 tests)
+- [x] Tests unitarios con pytest (145 tests)
 - [x] Embeddings multilingües + Cross-Encoder reranking
 - [x] Caché semántico + Protección prompt injection
 - [x] Configuración centralizada (Pydantic Settings)
@@ -681,8 +682,8 @@ knowligo/
 ### Fase 2: Mejoras de UX (Mar 2026)
 
 - [ ] Soporte para multimedia (imágenes, PDFs)
-- [ ] Historial conversacional multi-turno
-- [ ] Botones interactivos en WhatsApp
+- [x] Historial conversacional multi-turno
+- [x] Botones interactivos en WhatsApp (Interactive Lists + Reply Buttons)
 - [ ] Sugerencias de preguntas relacionadas
 - [ ] Feedback loop (👍👎 después de respuesta)
 - [ ] Mejora de prompts con few-shot examples
@@ -902,4 +903,4 @@ knowligo/
 
 | Versión | Fecha | Cambios | Autor |
 |---------|-------|---------|-------|
-| 1.0 | 2026-02-10 | Documento inicial | Equipo KnowLigo |
+| 1.0 | 2026-02-10 | Documento inicial | Facundo |

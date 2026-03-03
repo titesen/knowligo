@@ -191,16 +191,15 @@ python scripts\test_api.py
 docker-compose logs -f
 ```
 
-### Pre-demo (antes de grabar video)
+### Pre-demo
 ```powershell
 # 1. Validar completo
 python scripts\validate_demo.py
 
-# 2. Si algo falla, ver DEMO_CHECKLIST.md
-# 3. Ejecutar tests
+# 2. Ejecutar tests
 python scripts\test_api.py
 
-# 4. Probar query manual en WhatsApp
+# 3. Probar query manual en WhatsApp
 ```
 
 ---
@@ -254,8 +253,6 @@ docker-compose up -d
 
 - **WHATSAPP_SETUP.md** - Configuración completa de WhatsApp
 - **QUICK_START.md** - Guía rápida de inicio
-- **DEMO_CHECKLIST.md** - Checklist pre-demo
-- **DEMO_SCRIPT.md** - Script para video de LinkedIn
 - **README.md** - Documentación principal
 
 ---

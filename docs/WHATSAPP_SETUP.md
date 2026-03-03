@@ -308,17 +308,4 @@ Reemplaza el token temporal con el token de System User (Paso 1.4).
 
 ---
 
-## 🎥 Listo para Grabar Demo
-
-Una vez que todos los checks estén ✅, puedes grabar tu video mostrando:
-
-1. ✅ Arquitectura del sistema (diagrama)
-2. ✅ API funcionando (Swagger UI)
-3. ✅ **Demo en vivo**: Enviar mensaje a WhatsApp y recibir respuesta
-4. ✅ Tests con pytest (`python -m pytest tests/ -v`)
-5. ✅ Mostrar logs/analytics en tiempo real
-6. ✅ Código del RAG pipeline (explicar componentes)
-
----
-
-**¿Tienes dudas?** Revisa esta guía paso a paso o consulta los logs de la API para debugging.
+**¿Tienes dudas?** Revisá esta guía paso a paso o consultá los logs de la API para debugging.
