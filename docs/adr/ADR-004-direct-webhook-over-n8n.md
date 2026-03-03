@@ -1,7 +1,6 @@
 # ADR-004: Webhook Directo en FastAPI sobre n8n
 
 **Estado**: Aceptada (reemplaza implementación anterior)  
-**Fecha**: 2026-01-20  
 **Autores**: Facundo  
 
 ---

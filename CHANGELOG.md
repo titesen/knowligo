@@ -5,7 +5,7 @@ Todos los cambios notables de este proyecto se documentan en este archivo.
 El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/),
 y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
-## [1.1.0] - 2026-03-02
+## [1.1.0]
 
 ### Added
 - **UI interactiva de WhatsApp**: Interactive Lists para menús y selección de prioridad/planes, Reply Buttons para confirmaciones y métodos de pago
@@ -20,7 +20,7 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 - `api/main.py`: `send_whatsapp_message()` envía payloads interactivos para ListMessage/ButtonMessage
 - Total de tests: 119 → 145
 
-## [1.0.0] - 2026-02-28
+## [1.0.0]
 
 ### Added
 - Agente conversacional completo con 10 intenciones (saludo, RAG, tickets, contratos, planes, cuenta, etc.)

@@ -1,7 +1,6 @@
 # ADR-003: Groq API (Free Tier) como Proveedor LLM
 
 **Estado**: Aceptada  
-**Fecha**: 2025-12-01  
 **Autores**: Facundo  
 
 ---

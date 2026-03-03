@@ -49,7 +49,7 @@
   - [ ] No hay `print()` en código runtime
   - [ ] No hay secrets hardcodeados
 
-## Reglas de Dependencia (ver AGENTS.md §3)
+## Reglas de Dependencia (ver AGENTS.md)
 
 ```
 api/       → puede importar de agent/ y rag/query/

@@ -1,7 +1,6 @@
 # ADR-002: Retrieval Híbrido FAISS + BM25 con RRF Fusion
 
 **Estado**: Aceptada  
-**Fecha**: 2026-01-15  
 **Autores**: Facundo  
 
 ---
@@ -42,6 +41,6 @@ HybridRetriever (rag/query/retriever.py)
       └── CrossEncoderReranker.rerank()  →  final top-5
 ```
 
-### Métricas observadas
-- Dense-only: ~78% relevancia en top-5
-- Hybrid + RRF + reranking: ~91% relevancia en top-5
+### Beneficio esperado
+- Dense-only tiene limitaciones con términos técnicos exactos y códigos
+- Hybrid + RRF + reranking mejora significativamente la cobertura léxica + semántica

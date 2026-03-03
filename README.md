@@ -202,7 +202,7 @@ knowligo/
 │   └── test_validator.py  # Tests de validación
 ├── scripts/
 │   ├── test_api.py        # Tests funcionales manuales
-│   ├── validate_demo.py   # Validación pre-demo
+│   ├── validate_demo.py   # Validación del sistema
 │   ├── quick_start.py     # Inicio rápido de servicios
 │   ├── start.ps1          # Script PowerShell interactivo
 │   └── utils/             # Utilidades (init_db.py)
@@ -333,8 +333,8 @@ WHATSAPP_PHONE_NUMBER_ID=123456789012345
 WHATSAPP_VERIFY_TOKEN=knowligo_webhook_2026
 
 # Configuración
-MAX_MESSAGE_LENGTH=150
-MAX_QUERIES_PER_HOUR=15
+MAX_MESSAGE_LENGTH=300
+MAX_QUERIES_PER_HOUR=30
 LLM_MODEL=llama-3.3-70b-versatile
 ```
 
@@ -368,7 +368,7 @@ MIT License - Proyecto educativo de código abierto
 
 ## 👤 Autor
 
-**Facundo** - Proyecto educacional para demostración en LinkedIn
+**Facundo** - Proyecto educacional
 
 ## 🙏 Agradecimientos
 

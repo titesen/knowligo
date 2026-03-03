@@ -1,6 +1,6 @@
-# 🚀 Quick Start - KnowLigo WhatsApp Demo
+# 🚀 Quick Start - KnowLigo
 
-Script rápido para levantar todo y hacer demo.
+Guía rápida para levantar el proyecto.
 
 ## Pre-requisitos
 
@@ -139,7 +139,7 @@ docker-compose logs -f api
 
 ---
 
-## ✅ Checklist Pre-Demo
+## ✅ Checklist
 
 ```
 [ ] .env configurado con credenciales reales

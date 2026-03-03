@@ -629,91 +629,59 @@ knowligo/
 
 ---
 
-## 📊 Métricas de Éxito
+## 📊 Objetivos de Diseño
 
-### KPIs Primarios
+### Objetivos Primarios
 
-| Métrica | Objetivo | Medición |
-|---------|----------|----------|
-| **Tasa de Automatización** | 70% de consultas sin escalamiento humano | `queries_resueltas / total_queries` |
-| **Tiempo de Respuesta** | <3s p95 | Logged en DB |
-| **Precisión de Respuestas** | >85% respuestas correctas | Evaluation manual mensual |
-| **Uptime** | 99.5% mensual | Health checks |
-| **Costo por Query** | <$0.01 | Groq API usage |
+| Objetivo | Criterio |
+|----------|----------|
+| **Automatización** | Mayoría de consultas resueltas sin escalamiento humano |
+| **Tiempo de Respuesta** | Respuestas en segundos (dependiente de Groq API) |
+| **Precisión** | Respuestas basadas únicamente en la base de conocimiento |
+| **Disponibilidad** | Health checks automatizados |
+| **Costo** | $0 (free tier de Groq + infraestructura local) |
 
-### KPIs Secundarios
+### Objetivos de Calidad RAG
 
-| Métrica | Objetivo | Medición |
-|---------|----------|----------|
-| Usuarios activos diarios | 20+ | Distinct user_id/day |
-| Satisfacción del usuario | >4/5 | Encuesta post-query (futuro) |
-| Tasa de error | <5% | `errors / total_queries` |
-| Queries por usuario | 3-5/día promedio | Avg queries/user |
-| Distribución de intents | Balanceado | Analytics |
-
-### Métricas de Calidad RAG
-
-| Métrica | Objetivo | Evaluación |
-|---------|----------|------------|
-| **Retrieval Precision@3** | >0.8 | Top-3 chunks relevantes |
-| **LLM Hallucination Rate** | <10% | Review manual |
-| **Context Relevance** | >0.85 | Score promedio FAISS |
-| **Response Coherence** | >4/5 | Evaluación cualitativa |
+| Objetivo | Estrategia |
+|----------|------------|
+| **Retrieval Precision** | Hybrid search (FAISS + BM25) con Cross-Encoder reranking |
+| **Baja alucinación** | System prompt estricto + contexto acotado a chunks relevantes |
+| **Relevancia de contexto** | RRF fusion + reranking reduce ruido en chunks |
+| **Coherencia** | Temperature 0.5 + max_tokens controlados |
 
 ---
 
-## 🗺️ Roadmap
+## �️ Funcionalidades Implementadas
 
-### Fase 1: MVP (Completado - Feb 2026)
+### Completado
 
-- [x] Sistema RAG funcional
+- [x] Sistema RAG funcional (FAISS + BM25 + RRF + Cross-Encoder reranking)
 - [x] Integración WhatsApp vía webhook FastAPI directo
-- [x] 6 intents básicos
-- [x] Rate limiting
-- [x] Logging básico
-- [x] API REST con FastAPI
+- [x] 10 intents con LLM Router (Groq)
+- [x] Rate limiting por usuario
+- [x] Logging estructurado
+- [x] API REST con FastAPI (/webhook, /query, /health, /stats)
 - [x] Docker Compose deployment
-- [x] Documentación inicial
+- [x] Documentación completa (AGENTS.md, ADRs, diagramas Mermaid, PRD, INDEX, llms.txt)
 - [x] Tests unitarios con pytest (145 tests)
 - [x] Embeddings multilingües + Cross-Encoder reranking
 - [x] Caché semántico + Protección prompt injection
 - [x] Configuración centralizada (Pydantic Settings)
-
-### Fase 2: Mejoras de UX (Mar 2026)
-
-- [ ] Soporte para multimedia (imágenes, PDFs)
 - [x] Historial conversacional multi-turno
 - [x] Botones interactivos en WhatsApp (Interactive Lists + Reply Buttons)
-- [ ] Sugerencias de preguntas relacionadas
-- [ ] Feedback loop (👍👎 después de respuesta)
-- [ ] Mejora de prompts con few-shot examples
+- [x] Flujos multi-turn: registro, tickets, contratos, pagos
+- [x] HyDE-lite query rewriting
+- [x] Detección de gibberish y saludos repetidos
+- [x] Menú adaptativo según estado de registro
 
-### Fase 3: Analytics y Optimización (Abr 2026)
+### Pendiente
 
+- [ ] Soporte para multimedia (imágenes, PDFs)
 - [ ] Dashboard de métricas (Grafana/Streamlit)
-- [ ] A/B testing de prompts
-- [ ] Análisis de sentiment
-- [ ] Detección de topics emergentes
-- [ ] Reportes automáticos semanales
-- [ ] Fine-tuning de embeddings con feedback
-
-### Fase 4: Escalabilidad (May-Jun 2026)
-
-- [ ] PostgreSQL en lugar de SQLite
-- [ ] Redis para caching y rate limiting
-- [ ] Queue system (Celery/RabbitMQ) para async
-- [ ] Multiple LLM backends (fallback)
-- [ ] Horizontal scaling (Kubernetes)
-- [ ] CDN para assets estáticos
-
-### Fase 5: Funcionalidades Avanzadas (Q3 2026)
-
-- [ ] Creación de tickets automática
-- [ ] Integración con CRM (HubSpot/Salesforce)
 - [ ] Soporte multiidioma (ES/EN/PT)
-- [ ] Agente multi-modal (voz, imagen)
-- [ ] RAG híbrido (keyword + semantic)
-- [ ] Fine-tuned LLM específico del dominio
+- [ ] Monitoreo con Prometheus/Grafana
+- [ ] Frontend web para administración
 
 ---
 
@@ -899,8 +867,8 @@ knowligo/
 - [FastAPI Documentation](https://fastapi.tiangolo.com/)
 - [WhatsApp Business API](https://developers.facebook.com/docs/whatsapp)
 
-### C. Changelog del PRD
+### C. Historial del PRD
 
-| Versión | Fecha | Cambios | Autor |
-|---------|-------|---------|-------|
-| 1.0 | 2026-02-10 | Documento inicial | Facundo |
+| Versión | Cambios | Autor |
+|---------|---------|-------|
+| 1.0 | Documento inicial | Facundo |

@@ -1,7 +1,6 @@
 # ADR-001: SQLite sobre PostgreSQL
 
 **Estado**: Aceptada  
-**Fecha**: 2025-12-01  
 **Autores**: Facundo  
 
 ---
