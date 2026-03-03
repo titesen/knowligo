@@ -368,14 +368,7 @@ MIT License - Proyecto educativo de código abierto
 
 ## 👤 Autor
 
-**Facundo** - Proyecto educacional
-
-## 🙏 Agradecimientos
-
-- [Groq](https://groq.com) por su LLM API gratuita
-- [Meta](https://developers.facebook.com) por WhatsApp Business API
-- [Sentence Transformers](https://www.sbert.net/) por los embeddings
-- [FAISS](https://github.com/facebookresearch/faiss) por el vector search
+**Facundo Nicolás González**
 
 ---
 
